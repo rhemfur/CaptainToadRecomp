@@ -77,6 +77,11 @@ int ct_gx2_test() {
        ld32(program)==0x57574653 && ld32(program+4)==2 && ld32(program+16)==0x02010203 &&
        ld32(program+20)==8 && ld32(program+24)==0x00070804 && ld32(program+28)==0x00010203 &&
        ld32(fetch+0x20)==0xAABBCCDD && ld32(program+48)==0x11223344;
+    auto depth=mem::runtime_alloc(0xA0),hiz=mem::runtime_alloc(12);
+    st32(hiz+8,0xDEADBEEF);
+    invoke("GX2CalcDepthBufferHiZInfo",{depth,hiz,hiz+4});
+    invoke("GX2InitDepthBufferHiZEnable",{depth,1});
+    ok=ok && ld32(hiz)==0x1000 && ld32(hiz+4)==0x100 && ld32(hiz+8)==0xDEADBEEF;
     auto sampler=mem::runtime_alloc(16);
     st32(sampler+12,0xDEADBEEF);
     invoke("GX2InitSampler",{sampler,2,1});
@@ -116,6 +121,6 @@ int ct_gx2_test() {
     invoke("GX2CopySurface",{tiled,0,0,roundtrip,0,0});
     ok=ok && verify_pixels() && ld32(source_data+allocation)==0x01234567 &&
        ld32(tiled_data+target_size)==0x12345678 && ld32(result_data+source_size)==0x23456789;
-    LOG("[ct-test] GX2 state/resources/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
+    LOG("[ct-test] GX2 state/resources/HiZ/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
     return ok?0:1;
 }

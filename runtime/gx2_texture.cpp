@@ -124,9 +124,16 @@ HLE(gx2, GX2SetDepthBuffer) {
 }
 
 
+// HiZ follows Cemu GX2_Surface.cpp (MPL-2.0): the host depth test never reads HTILE data, so the query
+// reports Cemu's fixed 0x1000-byte buffer with 0x100 alignment and the enable flag changes no state.
+HLE(gx2, GX2CalcDepthBufferHiZInfo) {
+    gp<GX2::GX2DepthBuffer>(arg(c,0));
+    auto size=arg(c,1), alignment=arg(c,2);
+    gp<uint32_t>(size); gp<uint32_t>(alignment);
+    st32(size,0x1000);
+    st32(alignment,0x100);
+}
 HLE(gx2, GX2InitDepthBufferHiZEnable) {
     gp<GX2::GX2DepthBuffer>(arg(c,0));
-    if (arg(c,1)) { LOG("[ct-stop] HiZ acceleration requires implementation"); std::_Exit(78); }
-    // HiZ is an optional acceleration path. Disabled requests use ordinary depth evaluation.
-    LOG("[ct-gx2] HiZ acceleration disabled for depth buffer %08X",arg(c,0));
+    LOG("[ct-gx2] HiZ %s for depth buffer %08X; host depth evaluation ignores it",arg(c,1)?"requested":"disabled",arg(c,0));
 }

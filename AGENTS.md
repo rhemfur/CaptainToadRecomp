@@ -4,4 +4,4 @@ Use English for all public repository documentation, code comments, user-facing 
 
 Keep game dumps, tickets, keys, generated game code, diagnostic logs, device identifiers and compiled game binaries local and excluded from Git. Publish only tools, runtime source, identification metadata and documentation.
 
-Describe verified behavior accurately. The current diagnostic passes GX2Init and resource preparation, then stops at GX2CalcDepthBufferHiZInfo; this is not a playable game or APK. Do not claim graphics, performance or gameplay compatibility without testing it.
+Describe verified behavior accurately. The current diagnostic passes GX2Init, resource preparation and HiZ queries, then stops at nn_act.Initialize; this is not a playable game or APK. Do not claim graphics, performance or gameplay compatibility without testing it.
