@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, initializes a Vulkan device, configures its TV buffer and prepares graphics resources and depth buffers, initializes its account service, starts its file-loading, decompression and save-data threads, then stops at `gx2.GX2GetVertexShaderGPRs`. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, initializes a Vulkan device, configures its TV buffer and prepares graphics resources and depth buffers, initializes its account service, starts its file-loading, decompression and save-data threads, queries its shaders' register and stack requirements, then stops at `gx2.GX2SetVertexShader`. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -119,11 +119,11 @@ Validation on October 10, 2026:
 
 - Six CTest cases passed on Windows: SHA-256 vectors, same-core mutex contention, filesystem reads/writes/bounds, MCP/UC records, GX2 resources/state and rejection of an unknown RPX.
 - Native SHA-256, fast mutex, filesystem and MCP/UC tests passed on the S25 Ultra. The Vulkan probe created an instance and a logical device.
-- The diagnostic passes `GX2Init` and configures the game's 1280x720 TV scan buffer. It prepares surfaces, fetch descriptors, samplers and render-target registers. A later Windows ARM64 run passed the HiZ queries for every depth buffer, including two that request HiZ, initialized `nn_act` and stopped at `GX2GetVertexShaderGPRs`.
+- The diagnostic passes `GX2Init` and configures the game's 1280x720 TV scan buffer. It prepares surfaces, fetch descriptors, samplers and render-target registers. A later Windows ARM64 run passed the HiZ queries for every depth buffer, including two that request HiZ, initialized `nn_act`, answered the shader GPR and stack-entry queries and stopped at `GX2SetVertexShader`.
 
 ## Next step: shaders and presentation
 
-Provide the shader register queries beginning with `GX2GetVertexShaderGPRs`, then integrate shader translation, draw submission and scanout presentation to obtain the first game image. Audio, controls, real saves and APK packaging follow. The current bridge stops on unsupported drawing commands.
+Bind vertex, pixel and geometry shaders beginning with `GX2SetVertexShader`, then integrate shader translation, draw submission and scanout presentation to obtain the first game image. Audio, controls, real saves and APK packaging follow. The current bridge stops on unsupported drawing commands.
 
 Current graphics limitations: only the verified TV scan mode 3 and RGBA8 and sRGB RGBA8 scan-buffer formats are supported; tessellated fetch shaders stop the diagnostic. HiZ follows Cemu: `GX2CalcDepthBufferHiZInfo` reports a fixed 0x1000-byte buffer with 0x100 alignment and HiZ enable requests change no host state, because host depth evaluation never reads HTILE data. Surface copies currently operate on CPU-backed guest memory; MSAA and GPU-written game surfaces require additional work. No game frame has been rendered.
 

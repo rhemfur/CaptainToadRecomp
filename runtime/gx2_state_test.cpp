@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include <string>
 #include "gx2/gx2_cmd.h"
 #include "gx2/gx2_regs.h"
 #include "gx2_texture_regs.h"
@@ -82,6 +83,12 @@ int ct_gx2_test() {
     invoke("GX2CalcDepthBufferHiZInfo",{depth,hiz,hiz+4});
     invoke("GX2InitDepthBufferHiZEnable",{depth,1});
     ok=ok && ld32(hiz)==0x1000 && ld32(hiz+4)==0x100 && ld32(hiz+8)==0xDEADBEEF;
+    auto shader=mem::runtime_alloc(8)+2; // Captain Toad passes a 2-byte-aligned vertex shader.
+    st8(shader,0); st8(shader+1,0); st8(shader+2,0x0A); st8(shader+3,0x1F);
+    for (auto kind:{"Vertex","Pixel","Geometry"}) {
+        ok=ok && invoke((std::string("GX2Get")+kind+"ShaderGPRs").c_str(),{shader})==0x1F &&
+           invoke((std::string("GX2Get")+kind+"ShaderStackEntries").c_str(),{shader})==0x0A;
+    }
     auto sampler=mem::runtime_alloc(16);
     st32(sampler+12,0xDEADBEEF);
     invoke("GX2InitSampler",{sampler,2,1});
@@ -121,6 +128,6 @@ int ct_gx2_test() {
     invoke("GX2CopySurface",{tiled,0,0,roundtrip,0,0});
     ok=ok && verify_pixels() && ld32(source_data+allocation)==0x01234567 &&
        ld32(tiled_data+target_size)==0x12345678 && ld32(result_data+source_size)==0x23456789;
-    LOG("[ct-test] GX2 state/resources/HiZ/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
+    LOG("[ct-test] GX2 state/resources/HiZ/shader-GPRs/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
     return ok?0:1;
 }
