@@ -25,8 +25,14 @@ if(CT_BUILD_DIAGNOSTIC)
   endif()
   find_package(ZLIB REQUIRED)
   find_package(Threads REQUIRED)
+  set(CT_CEMU "${REFERENCE_DIR}/runtime/third_party/cemu")
+  set(CT_GX2_SOURCES runtime/gx2_bridge.cpp runtime/gx2_state_test.cpp runtime/gx2_scanout.cpp runtime/gx2_surface.cpp runtime/gx2_fetch.cpp runtime/gx2_texture.cpp runtime/gx2_copy.cpp
+    "${REFERENCE_DIR}/runtime/src/gx2/gx2_state.cpp"
+    "${CT_CEMU}/gx2_surface_calc.cpp" "${CT_CEMU}/gx2_texture_regs.cpp"
+    "${CT_CEMU}/Cafe/HW/Latte/LatteAddrLib/LatteAddrLib.cpp"
+    "${CT_CEMU}/Cafe/HW/Latte/LatteAddrLib/LatteAddrLib_Coord.cpp")
   add_executable(ct-diagnostic
-    runtime/diagnostic.cpp runtime/vulkan_probe.cpp runtime/coreinit_boot.cpp runtime/fast_mutex.cpp runtime/mutex_test.cpp
+    runtime/diagnostic.cpp runtime/vulkan_device.cpp ${CT_GX2_SOURCES} runtime/coreinit_boot.cpp runtime/fast_mutex.cpp runtime/mutex_test.cpp
     runtime/filesystem.cpp runtime/filesystem_test.cpp
     runtime/mcp.cpp runtime/uc.cpp runtime/system_test.cpp
     "${REFERENCE_DIR}/runtime/src/core.cpp"
@@ -35,6 +41,11 @@ if(CT_BUILD_DIAGNOSTIC)
     "${REFERENCE_DIR}/runtime/src/write_watch.cpp"
     "${REFERENCE_DIR}/runtime/src/espresso_fp.c")
   target_include_directories(ct-diagnostic PRIVATE runtime "${REFERENCE_DIR}/runtime/include" "${REFERENCE_DIR}/runtime/src")
+  target_include_directories(ct-diagnostic PRIVATE "${REFERENCE_DIR}/runtime/src/gx2" "${CT_CEMU}" "${REFERENCE_DIR}/runtime/third_party/fmt/include")
+  set_source_files_properties(${CT_GX2_SOURCES}
+    PROPERTIES COMPILE_OPTIONS "-include;${CT_CEMU}/cemu_shim.h")
+  find_path(CT_VULKAN_INCLUDE_DIR vulkan/vulkan.h HINTS "${ZLIB_ROOT}/include" REQUIRED)
+  target_include_directories(ct-diagnostic SYSTEM PRIVATE "${CT_VULKAN_INCLUDE_DIR}")
   target_compile_features(ct-diagnostic PRIVATE cxx_std_20)
   target_compile_definitions(ct-diagnostic PRIVATE CT_DIAGNOSTIC_STRICT_HLE=1)
   target_compile_options(ct-diagnostic PRIVATE -O2 -ffp-contract=off -fsigned-char -Wall -Wno-unused-function)
@@ -49,6 +60,7 @@ if(CT_BUILD_DIAGNOSTIC)
   set_tests_properties(ct_fast_mutex_same_core PROPERTIES TIMEOUT 12)
   add_test(NAME ct_filesystem_roundtrip COMMAND ct-diagnostic --fs-self-test "${CMAKE_BINARY_DIR}/fs-fixture")
   add_test(NAME ct_system_record COMMAND ct-diagnostic --system-self-test)
+  add_test(NAME ct_gx2_state COMMAND ct-diagnostic --gx2-self-test)
   file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/rejected-fixture/code")
   file(WRITE "${CMAKE_BINARY_DIR}/rejected-fixture/code/Kinopio.rpx" "synthetic invalid RPX fixture")
   add_test(NAME ct_reject_unknown_image COMMAND ct-diagnostic --game "${CMAKE_BINARY_DIR}/rejected-fixture" --verify-only)

@@ -33,3 +33,13 @@
 - Research reference for the Switch version. No source from this project has been incorporated into the prototype.
 
 No Nintendo game assets or generated game code are included in this repository.
+
+## GX2 resource bridge
+
+- `runtime/gx2_bridge.cpp` adapts default GPU register state from the pinned ZeldaWWHDRecomp `gx2_core.cpp`; its display-list/context bridge is project code.
+- `runtime/gx2_texture.cpp` adapts texture, sampler and render-target bindings from that project's `gx2_resources.cpp`.
+- `runtime/gx2_fetch.cpp` adapts its native fetch-descriptor encoding. The format identifier is preserved for compatibility; it is not hardware shader microcode.
+- `runtime/gx2_copy.cpp` adapts the CPU-backed tiling conversion path from `gfx/vulkan/surfaces.cpp`.
+- Scan-buffer/ring calculations were checked against the reference and Cemu's `GX2_shader_legacy.cpp`; display-list write status was checked against Cemu's `GX2_Command.cpp`. HiZ enable's signature was checked against devkitPro/wut `include/gx2/surface.h`; no wut source was incorporated.
+- The build reuses the reference's Cemu-derived surface calculator, AddrLib, texture-register helpers and GX2 state setters from the separate checkout. Their MPL-2.0 notices remain there. It also uses vendored fmt headers (MIT), with their license in the reference checkout.
+- `runtime/vulkan_device.cpp` implements the project's device bootstrap and synthetic GPU transfer test. These operations do not include game assets or shaders.

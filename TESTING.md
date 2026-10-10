@@ -16,10 +16,10 @@ The ARM64 prototype uses Android API 33 as its build minimum. A device running A
 
 ## Verified behavior
 
-- The native diagnostic entered Captain Toad's startup code and reached `gx2.GX2Init`.
+- The native diagnostic entered Captain Toad's startup code and passed `gx2.GX2Init`, configured the TV buffer and reached `gx2.GX2CalcDepthBufferHiZInfo`.
 - Vulkan instance and logical device creation passed on the system driver.
 - Native tests passed for SHA-256 vectors, fast-mutex recursion/ownership/same-core contention, filesystem reads and synthetic save round trips, and MCP/UC records.
-- Five runtime CTest cases passed on Windows; 17 existing reference recompiler tests passed.
+- Six runtime CTest cases passed on Windows; 17 existing reference recompiler tests passed.
 
 These results do not validate the game's renderer, graphics, audio, real saves, performance or gameplay. APK integration remains unfinished.
 
@@ -33,6 +33,14 @@ The device script uses `/data/local/tmp/captain-toad`. Filesystem tests use a sy
 
 ## Next validation
 
-Integrate GX2 and the Vulkan renderer to obtain the first image. Then verify the menu, first level, audio, touch/controller input, real save/load behavior and suspend/resume. Report measured performance rather than inferring frame rates from another game.
+Resolve auxiliary-buffer sizing and integrate shader draws and Vulkan presentation to obtain the first game image. Then verify the menu, first level, audio, touch/controller input, real save/load behavior and suspend/resume. Report measured performance rather than inferring frame rates from another game.
 
 See `README.md` for reproducible commands and current runtime limitations.
+
+## Graphics tests
+
+The synthetic Vulkan clear/readback passed with 256/256 matching RGBA pixels on Adreno 830. The same operation passed on the desktop RTX 2080 Ti. No game frame was rendered.
+
+GX2 resource/state tests passed for viewport packing, display lists, isolated contexts, scan-buffer sizing, surface alignment, fetch descriptors and sampler bindings. Surface-copy tests passed for linear/tiled round trips and overlapping ranges. Guard bytes were preserved.
+
+All 1,569 transferred content/meta files passed SHA-256 verification in the isolated phone directory. This checks file transfer integrity, not gameplay compatibility.

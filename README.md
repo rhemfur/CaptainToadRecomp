@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, then stops at `gx2.GX2Init`. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, initializes a Vulkan device, configures its TV buffer and prepares graphics resources, then stops at `gx2.GX2CalcDepthBufferHiZInfo`. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -33,7 +33,7 @@ Preparation and generation require empty output directories. These commands prod
 
 - `tools/`: game preparation, RPX auditing, C generation, builds and device diagnostics.
 - `profiles/captain-toad-eur-v16.json`: SHA-256 identification of the updated RPX, with no Zelda hooks.
-- `runtime/`: startup services, fast mutex, filesystem, diagnostic executable and tests.
+- `runtime/`: startup services, fast mutex, filesystem, GX2 bridge, headless Vulkan device and tests.
 - `upstream/`: separately downloaded ZeldaWWHDRecomp reference checkout, ignored by Git.
 - `work/extracted/base` and `work/extracted/update`: separate local game/update extractions.
 - `game/`: effective game tree, with update files replacing matching base paths.
@@ -62,7 +62,7 @@ The reference recompiler accepts an optional `hook_paths` argument. Omitting it 
 - Translation reported 36 words with primary opcode 0. They still call `ppc_unimplemented`; they have not been replaced with NOPs. Their reachability and possible use as embedded data or padding remain to be investigated.
 - Two calls to undefined symbols remain explicit diagnostics.
 
-Diagnostic startup is confirmed on Android and Windows through the call to `GX2Init`. On the S25 Ultra, Vulkan instance and logical device creation passed; the Adreno 830 driver reported API 1.3.284. This does not validate the game's renderer, menus, audio, real saves or gameplay.
+Diagnostic startup passes `GX2Init` on Android and Windows, configures a 1280x720 TV buffer and reaches the depth-buffer auxiliary-size query. On the S25 Ultra, Vulkan instance and logical device creation passed; the Adreno 830 driver reported API 1.3.284. This does not validate the game's renderer, menus, audio, real saves or gameplay.
 
 ## Regenerate local outputs
 
@@ -94,7 +94,7 @@ python -m unittest discover -s upstream/tools/recomp -p test_builds.py
 
 ## Run the diagnostic
 
-The native diagnostic verifies the RPX SHA-256 before loading guest memory, initializes data imports and starts Captain Toad's guest threads. It has no renderer, audio backend, snapshots or Zelda hooks. An unsupported API stops it with exit code 78; the default ten-second deadline stops it with 124.
+The native diagnostic verifies the RPX SHA-256 before loading guest memory, initializes data imports and starts Captain Toad's guest threads. It has a headless Vulkan device bootstrap and a GX2 resource/state bridge, but no game draw translation, scanout presentation, audio backend, snapshots or Zelda hooks. An unsupported API stops it with exit code 78; the default ten-second deadline stops it with 124.
 
 On Windows, using the installed Clang/MSYS2 and CMake:
 
@@ -113,19 +113,21 @@ powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Seria
 
 The device script uses `/data/local/tmp/captain-toad` and selects the device explicitly. Logs remain in `local-reports/`, outside Git. This diagnostic does not require installing an APK. Its executable contains recompiled game code and stays local.
 
-Other script modes are `SelfTest`, `Mutex`, `Filesystem`, `System` and `Verify`. Filesystem tests use synthetic content and save files in a separate fixture directory.
+Other script modes are `SelfTest`, `Mutex`, `Filesystem`, `System`, `Gx2`, `Clear` and `Verify`. `Gx2` exercises resource/state handling; `Clear` checks a synthetic Vulkan image and readback. Filesystem tests use synthetic content and save files in a separate fixture directory.
 
 Validation on October 10, 2026:
 
-- Five CTest cases passed on Windows: SHA-256 vectors, same-core mutex contention, filesystem reads/writes/bounds, MCP/UC records and rejection of an unknown RPX.
+- Six CTest cases passed on Windows: SHA-256 vectors, same-core mutex contention, filesystem reads/writes/bounds, MCP/UC records, GX2 resources/state and rejection of an unknown RPX.
 - Native SHA-256, fast mutex, filesystem and MCP/UC tests passed on the S25 Ultra. The Vulkan probe created an instance and a logical device.
-- With startup services implemented, the diagnostic reached `gx2.GX2Init`. Graphics initialization and rendering remain unfinished.
+- The diagnostic passes `GX2Init` and configures the game's 1280x720 TV scan buffer. It prepares surfaces, fetch descriptors, samplers and render-target registers, then stops at `GX2CalcDepthBufferHiZInfo`.
 
-## Next step: GX2 and Vulkan rendering
+## Next step: auxiliary buffers, shaders and presentation
 
-Integrate GX2 APIs and the generic rendering queue while separating Zelda's mod, camera and interpolation dependencies. Start at the first graphics call, `GX2Init`, and work toward the first rendered image. Audio, controls, real saves and APK packaging follow.
+Resolve the depth-buffer auxiliary allocation query, then integrate shader translation, draw submission and scanout presentation to obtain the first game image. Audio, controls, real saves and APK packaging follow. The current bridge stops on unsupported drawing commands.
 
-Current limitations: `_iob` has no implemented stream ABI; imported exception/atexit callbacks remain null; unsupported words and undefined calls remain explicit failures; only three UC settings are supported, with English and an EUR virtual console as the initial configuration. Unknown settings stop the diagnostic. Fast-mutex ownership queues, priority inheritance and save states are not implemented.
+Current graphics limitations: only the verified TV scan mode 3 and RGBA8 and sRGB RGBA8 scan-buffer formats are supported; enabling HiZ acceleration and tessellated fetch shaders stops the diagnostic. Surface copies currently operate on CPU-backed guest memory; MSAA and GPU-written game surfaces require additional work. The HiZ auxiliary-size calculation is not implemented. No game frame has been rendered.
+
+Other limitations: `_iob` has no implemented stream ABI; imported exception/atexit callbacks remain null; unsupported words and undefined calls remain explicit failures; only three UC settings are supported, with English and an EUR virtual console as the initial configuration. Unknown settings stop the diagnostic. Fast-mutex ownership queues, priority inheritance and save states are not implemented.
 
 The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 
@@ -134,3 +136,20 @@ The Switch decompilation may help identify equivalent functions, but no code fro
 Project tools and modifications are licensed under MPL-2.0; see `LICENSE`. ZeldaWWHDRecomp provides the reference recompiler/runtime and retains its original license and third-party credits in the separate checkout. See `THIRD_PARTY_NOTICES.md`.
 
 This is an independent fan project, not affiliated with Nintendo. Game and console names identify intended compatibility. The repository contains tools, runtime source, identification metadata and documentation; game files and generated game code remain local.
+
+## Graphics bootstrap validation
+
+On October 10, 2026:
+
+- GX2 defaults, viewport packing, display-list record/replay, context isolation, scan-buffer sizing, surface alignment, ring sizes, fetch descriptors and samplers passed tests on Windows and the S25 Ultra.
+- CPU surface copies passed linear-to-tiled round trips and overlapping source/destination tests, with guard bytes preserved. The real startup code performed a 16x8, 32-bit surface copy from tiling mode 0 to mode 2.
+- The synthetic Vulkan clear/readback test matched all 256 expected RGBA pixels on Adreno 830 and the desktop NVIDIA GeForce RTX 2080 Ti. This verifies a transfer operation; it does not validate game shaders or draw calls.
+- All 1,569 transferred content/meta files were verified by SHA-256 on the S25 Ultra. Game files, checksum manifests and logs remain local.
+
+Run the GPU readback test with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Serial <local-device-id> -Mode Clear
+```
+
+The native device uses basic Vulkan 1.3 functionality for this test. Optional renderer features have not yet been enabled or validated.

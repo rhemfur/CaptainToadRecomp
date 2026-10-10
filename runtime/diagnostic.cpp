@@ -41,6 +41,8 @@ uint32_t snap_ld32(uint32_t) { fatal("[ct-stop] snapshots are unavailable in the
 void mem_setup_heaps(uint32_t data_end);
 void mem_init_data_imports(uint32_t, uint32_t, uint32_t);
 int ct_vulkan_probe();
+int ct_vulkan_clear_test();
+int ct_gx2_test();
 int ct_mutex_test();
 int ct_filesystem_test(const std::string&);
 int ct_system_test();
@@ -97,6 +99,8 @@ int main(int argc, char** argv) {
         return ok?0:1;
     }
     if (argc==2 && std::string(argv[1])=="--vulkan-probe") return ct_vulkan_probe();
+    if (argc==2 && std::string(argv[1])=="--vulkan-clear-test") return ct_vulkan_clear_test();
+    if (argc==2 && std::string(argv[1])=="--gx2-self-test") return ct_gx2_test();
     if (argc==2 && std::string(argv[1])=="--mutex-self-test") return ct_mutex_test();
     if (argc==2 && std::string(argv[1])=="--system-self-test") return ct_system_test();
     if (argc==3 && std::string(argv[1])=="--fs-self-test") return ct_filesystem_test(argv[2]);

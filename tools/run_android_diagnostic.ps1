@@ -1,6 +1,6 @@
 param(
     [string]$Serial,
-    [ValidateSet('SelfTest','Mutex','Filesystem','System','Vulkan','Verify','Boot')]
+    [ValidateSet('SelfTest','Mutex','Filesystem','System','Vulkan','Clear','Gx2','Verify','Boot')]
     [string]$Mode = 'Boot',
     [string]$AndroidSdk = 'C:\Android\Sdk',
     [string]$NdkVersion = '30.0.16248370'
@@ -42,6 +42,8 @@ $taskOptions = switch ($Mode) {
     Filesystem { "--fs-self-test $taskRemote/fs-fixture" }
     System { '--system-self-test' }
     Vulkan { '--vulkan-probe' }
+    Clear { '--vulkan-clear-test' }
+    Gx2 { '--gx2-self-test' }
     Verify { "--game $taskRemote --verify-only" }
     Boot { "--game $taskRemote --seconds 10" }
 }

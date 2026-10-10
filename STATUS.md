@@ -2,7 +2,7 @@
 
 Updated October 10, 2026. Local workspace: `C:\DEV\Captain Toad`.
 
-**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra, then stops at `gx2.GX2Init`. There is no rendered game, playable APK or gameplay validation yet.**
+**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra, passes GX2 initialization and graphics resource preparation, then stops at `gx2.GX2CalcDepthBufferHiZInfo`. There is no rendered game, playable APK or gameplay validation yet.**
 
 ## Completed
 
@@ -15,7 +15,7 @@ Updated October 10, 2026. Local workspace: `C:\DEV\Captain Toad`.
 - Built and ran a headless diagnostic using generic memory, loader and thread components.
 - Added debugger/clock queries, fast mutex, filesystem and MCP/UC startup services.
 - Verified Vulkan instance and logical device creation on the S25 Ultra; Adreno 830 reported API 1.3.284.
-- Passed five runtime CTest cases on Windows, native hash/mutex/filesystem/system tests on Android, and 17 existing reference recompiler tests.
+- Passed six runtime CTest cases on Windows, native hash/mutex/filesystem/system tests on Android, and 17 existing reference recompiler tests.
 - Published source, tools, profiles and documentation. Game files, generated code, logs, binaries and device identifiers remain local and excluded from Git.
 
 The initial ARM64 static library was built with NDK `30.0.16248370`, Clang 21, API 33 and ABI `arm64-v8a`. Its initial size was 447,912,254 bytes and SHA-256 was `457f4f386460d4250950b5a8d496fd22d0c14935c43d601a910274e81c52b30a`. Later runtime builds are separate artifacts.
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Integrate GX2 with the Vulkan renderer and obtain the first rendered image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
+Resolve the HiZ auxiliary-size query and integrate shader translation, drawing and presentation to obtain the first game image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -61,3 +61,11 @@ Reaching startup and compiling native code do not establish full game correctnes
 - `local-reports/`: detailed manifests, audits and logs, kept outside Git.
 
 Pinned references: ZeldaWWHDRecomp `defb89f21607345e2e97b2c145a071a3f362640c`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
+
+## GX2 resource bootstrap
+
+Implemented generic register state, display-list recording/replay, context switching, scan-buffer metadata, surface size/alignment, fetch descriptors, texture/sampler bindings, render-target registers and CPU surface copies. GX2Init creates a headless Vulkan device; the game's TV scan buffer is configured as 1280x720.
+
+Six Windows CTest cases passed. GX2 resource tests also passed on the S25 Ultra, including tiled-copy round trips and overlapping ranges. A synthetic Vulkan clear/readback matched 256/256 expected RGBA pixels on both Adreno 830 and the desktop RTX 2080 Ti. The game performed a 16x8 CPU-backed surface copy during startup.
+
+The boot stops at GX2CalcDepthBufferHiZInfo. Its allocation behavior still needs an implementation; enabling HiZ, tessellated fetch shaders and unsupported draw operations remain explicit failures. Game shader translation and presentation are not implemented. All transferred content/meta assets passed SHA-256 verification on the phone.
