@@ -1,0 +1,15 @@
+diff --git a/tools/recomp/recomp.py b/tools/recomp/recomp.py
+index d43d1a8..9672afa 100644
+--- a/tools/recomp/recomp.py
++++ b/tools/recomp/recomp.py
+@@ -62,3 +62,3 @@ DATA_IMPORT_STRIDE = 0x1000
+ class Recompiler:
+-    def __init__(self, path, build=None, mod_hooks=False):
++    def __init__(self, path, build=None, mod_hooks=False, hook_paths=None):
+         """`build` is which build of the game `path` is (tools/recomp/builds.py); by default it is
+@@ -84,3 +84,4 @@ class Recompiler:
+         # a branch), so it can adjust what that instruction uses.
+-        hook_entries, self.skipped_hooks = game_builds.read_hooks(game_builds.hook_files(), self.build)
++        hook_entries, self.skipped_hooks = game_builds.read_hooks(
++            game_builds.hook_files() if hook_paths is None else hook_paths, self.build)
+         self.canon_of = {}              # this build's address -> canonical address (for symbol names)

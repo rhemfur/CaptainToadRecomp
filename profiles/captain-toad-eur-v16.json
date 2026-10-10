@@ -1,0 +1,10 @@
+{
+  "name": "CT-EUR-v16",
+  "title_id": "0005000010180700",
+  "update_title_id": "0005000e10180700",
+  "update_version": 16,
+  "rpx": "Kinopio.rpx",
+  "rpx_sha256": "3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464",
+  "hooks": [],
+  "status": "translation-prototype-not-playable"
+}

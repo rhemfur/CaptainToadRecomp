@@ -1,0 +1,20 @@
+# User-supplied game files, generated code, tools and build artifacts stay local.
+/game/
+/work/
+/build/
+/upstream/
+/local-reports/
+__pycache__/
+*.pyc
+*.key
+*.tik
+*.tmd
+*.cert
+*.app
+*.h3
+*.rpx
+*.rpl
+*.wud
+*.wux
+*.wua
+*.log

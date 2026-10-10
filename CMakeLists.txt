@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.20)
+project(captain_toad_translation_prototype LANGUAGES C)
+
+# This target checks generated code on the selected architecture. It is not an APK or a runnable port.
+if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+  message(FATAL_ERROR "Generated PPC code requires Clang musttail support")
+endif()
+set(REFERENCE_DIR "${CMAKE_SOURCE_DIR}/upstream" CACHE PATH "Reference Wii U runtime headers")
+set(GEN_DIR "${CMAKE_SOURCE_DIR}/build/gen" CACHE PATH "Locally generated Captain Toad C code")
+file(GLOB GENERATED_CODE CONFIGURE_DEPENDS "${GEN_DIR}/code_*.c")
+if(NOT GENERATED_CODE)
+  message(FATAL_ERROR "Run python tools/recompile.py against your extracted game first")
+endif()
+add_library(captain_toad_gamecode STATIC ${GENERATED_CODE} "${GEN_DIR}/table.c" "${GEN_DIR}/imports.c")
+target_include_directories(captain_toad_gamecode PRIVATE "${REFERENCE_DIR}/runtime/include" "${GEN_DIR}")
+target_compile_features(captain_toad_gamecode PRIVATE c_std_11)
+target_compile_options(captain_toad_gamecode PRIVATE -O2 -ffp-contract=off -fno-strict-aliasing -fsigned-char -w)
