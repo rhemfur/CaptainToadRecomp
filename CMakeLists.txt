@@ -28,6 +28,7 @@ if(CT_BUILD_DIAGNOSTIC)
   set(CT_CEMU "${REFERENCE_DIR}/runtime/third_party/cemu")
   set(CT_GX2_SOURCES runtime/gx2_bridge.cpp runtime/gx2_state_test.cpp runtime/gx2_scanout.cpp runtime/gx2_surface.cpp runtime/gx2_fetch.cpp runtime/gx2_shader.cpp runtime/gx2_texture.cpp runtime/gx2_copy.cpp
     "${REFERENCE_DIR}/runtime/src/gx2/gx2_state.cpp"
+    "${REFERENCE_DIR}/runtime/src/gx2/gx2_shader_regs.cpp"
     "${CT_CEMU}/gx2_surface_calc.cpp" "${CT_CEMU}/gx2_texture_regs.cpp"
     "${CT_CEMU}/Cafe/HW/Latte/LatteAddrLib/LatteAddrLib.cpp"
     "${CT_CEMU}/Cafe/HW/Latte/LatteAddrLib/LatteAddrLib_Coord.cpp")

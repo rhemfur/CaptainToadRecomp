@@ -2,7 +2,7 @@
 
 Updated October 10, 2026. Local workspace: `C:\DEV\Captain Toad`.
 
-**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra, passes GX2 initialization, graphics resource preparation depth-buffer HiZ queries , `nn_act` startup and shader GPR queries, then stops at `gx2.GX2SetVertexShader`. There is no rendered game, playable APK or gameplay validation yet.**
+**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra and passes GX2 initialization and graphics resource preparation. On Windows ARM64 it also passes depth-buffer HiZ queries, `nn_act` startup, shader GPR queries and vertex shader binding, then stops at `padscore.WPADEnableURCC`. There is no rendered game, playable APK or gameplay validation yet.**
 
 ## Completed
 
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Bind shaders beginning with `GX2SetVertexShader` and integrate shader translation, drawing and presentation to obtain the first game image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
+Provide the controller startup calls beginning with `padscore.WPADEnableURCC` and integrate shader translation, drawing and presentation to obtain the first game image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -68,4 +68,4 @@ Implemented generic register state, display-list recording/replay, context switc
 
 Six Windows CTest cases passed. GX2 resource tests also passed on the S25 Ultra, including tiled-copy round trips and overlapping ranges. A synthetic Vulkan clear/readback matched 256/256 expected RGBA pixels on both Adreno 830 and the desktop RTX 2080 Ti. The game performed a 16x8 CPU-backed surface copy during startup.
 
-HiZ follows Cemu: the size query reports 0x1000 bytes with 0x100 alignment and enable requests change no host state. On Windows ARM64 the boot passed those queries for every depth buffer, initialized `nn_act` with one local account in slot 1, started the file-loading, decompression and save-data threads, answered the shader GPR and stack-entry queries (including a vertex shader header at a 2-byte-aligned address) and stopped at `GX2SetVertexShader`. Tessellated fetch shaders and unsupported draw operations remain explicit failures. Game shader translation and presentation are not implemented. All transferred content/meta assets passed SHA-256 verification on the phone.
+HiZ follows Cemu: the size query reports 0x1000 bytes with 0x100 alignment and enable requests change no host state. On Windows ARM64 the boot passed those queries for every depth buffer, initialized `nn_act` with one local account in slot 1, started the file-loading, decompression and save-data threads, answered the shader GPR and stack-entry queries (including a vertex shader header at a 2-byte-aligned address), bound vertex shader registers and stopped at `padscore.WPADEnableURCC`. Tessellated fetch shaders and unsupported draw operations remain explicit failures. Game shader translation and presentation are not implemented. All transferred content/meta assets passed SHA-256 verification on the phone.

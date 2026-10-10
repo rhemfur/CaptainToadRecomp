@@ -89,6 +89,22 @@ int ct_gx2_test() {
         ok=ok && invoke((std::string("GX2Get")+kind+"ShaderGPRs").c_str(),{shader})==0x1F &&
            invoke((std::string("GX2Get")+kind+"ShaderStackEntries").c_str(),{shader})==0x0A;
     }
+    auto vs=mem::runtime_alloc(0x140)+2,ps=mem::runtime_alloc(0x100)+2,code=mem::runtime_alloc(0x200,256);
+    auto put=[](uint32_t address,uint32_t value) {
+        st8(address,value>>24); st8(address+1,value>>16); st8(address+2,value>>8); st8(address+3,value);
+    };
+    put(vs,0x102); put(vs+0x08,4); put(vs+0x0C,1); put(vs+0x10,0xFFFFFF00); put(vs+0x38,0x123);
+    put(vs+0x40,1); put(vs+0x44,0x7); put(vs+0xD0,0x100); put(vs+0xD4,code); put(vs+0xD8,1);
+    invoke("GX2SetVertexShader",{vs});
+    ok=ok && gx2::regs()[mmSQ_PGM_START_VS]==code>>8 && gx2::regs()[mmSQ_PGM_START_VS+1]==0x20 &&
+       gx2::regs()[mmSQ_PGM_RESOURCES_VS]==0x102 && gx2::regs()[mmSPI_VS_OUT_ID_0]==0xFFFFFF00 &&
+       gx2::regs()[mmPA_CL_VS_OUT_CNTL]==0x123 && gx2::regs()[mmSQ_VTX_SEMANTIC_0]==0x7;
+    put(ps,0x5); put(ps+0x08,0x34000003); put(ps+0x10,1); put(ps+0x14,0x100); put(ps+0x94,0xF);
+    put(ps+0xA4,0x80); put(ps+0xA8,code+0x100);
+    invoke("GX2SetPixelShader",{ps});
+    ok=ok && gx2::regs()[mmSQ_PGM_START_PS]==(code+0x100)>>8 && gx2::regs()[mmSQ_PGM_START_PS+1]==0x10 &&
+       gx2::regs()[mmSQ_PGM_RESOURCES_PS]==0x5 && gx2::regs()[mmSPI_PS_IN_CONTROL_0]==0x34000003 &&
+       gx2::regs()[mmSPI_PS_INPUT_CNTL_0]==0x100 && gx2::regs()[mmCB_SHADER_MASK]==0xF;
     auto sampler=mem::runtime_alloc(16);
     st32(sampler+12,0xDEADBEEF);
     invoke("GX2InitSampler",{sampler,2,1});
@@ -128,6 +144,6 @@ int ct_gx2_test() {
     invoke("GX2CopySurface",{tiled,0,0,roundtrip,0,0});
     ok=ok && verify_pixels() && ld32(source_data+allocation)==0x01234567 &&
        ld32(tiled_data+target_size)==0x12345678 && ld32(result_data+source_size)==0x23456789;
-    LOG("[ct-test] GX2 state/resources/HiZ/shader-GPRs/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
+    LOG("[ct-test] GX2 state/resources/HiZ/shader-GPRs/shader-binding/tiled-copy/overlap/bounds: %s",ok?"PASS":"FAIL");
     return ok?0:1;
 }
