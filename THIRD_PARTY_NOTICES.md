@@ -20,3 +20,11 @@
 
 - Fonte: https://github.com/shibbo/cttt-decomp
 - Referência de pesquisa da versão Switch. Não foi incorporado código desse projeto neste protótipo.
+
+## Componentes adaptados no runtime de diagnóstico
+
+- `runtime/filesystem.cpp` adapta `runtime/src/hle/fs.cpp` de ZeldaWWHDRecomp (MPL-2.0), removendo os redirecionamentos de mods/idiomas de Zelda e restringindo caminhos/escritas.
+- `runtime/coreinit_boot.cpp` adapta as consultas de debugger e clocks de `coreinit_misc.cpp` da mesma base.
+- `patches/strict-diagnostic-hle.patch` modifica `runtime/src/core.cpp` exclusivamente quando `CT_DIAGNOSTIC_STRICT_HLE` está ativo.
+- Os layouts e comportamentos de fast mutex, MCP e UC foram consultados na fonte de Cemu, MPL-2.0: https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Thread.h , https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Synchronization.cpp , https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.h e coreinit_MCP.cpp.
+- Nenhum código da versão Switch nem assets Nintendo foi adicionado.

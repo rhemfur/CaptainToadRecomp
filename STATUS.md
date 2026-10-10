@@ -57,3 +57,11 @@ A biblioteca estática contém código gerado compilado e ainda pode referenciar
 - `local-reports/game-manifest.json` e `local-reports/rpx-audit.json`: resultados detalhados locais.
 
 Referências preservadas: ZeldaWWHDRecomp `defb89f21607345e2e97b2c145a071a3f362640c`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
+
+## Marco de diagnóstico de boot — 10/10/2026
+
+O código recompilado entrou no boot no Galaxy S25 Ultra e no Windows. As primeiras dependências foram resolvidas com serviços de debugger/clocks, OSFastMutex, filesystem e MCP/UC. O boot atual chega a `gx2.GX2Init`; ainda não há imagem ou APK jogável.
+
+No S25 Ultra, criação de instância Vulkan 1.3 e dispositivo lógico foi verificada, com Adreno 830 reportando API 1.3.284. Passaram testes de SHA-256, concorrência/recursão de mutex, arquivos/saves sintéticos e registros MCP/UC. Cinco testes CTest também passaram no Windows; os 17 testes existentes do recompilador passaram. Logs e binários são locais e não foram publicados.
+
+Próximo trabalho: integrar GX2 e o renderer Vulkan para chegar à primeira imagem. Consultar README para os comandos reproduzíveis e limitações atuais.

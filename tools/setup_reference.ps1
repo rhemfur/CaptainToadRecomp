@@ -19,4 +19,6 @@ if ($LASTEXITCODE -ne 0 -or $taskActualCommit.Trim() -ne $taskCommit) {
 }
 & $Python (Join-Path $PSScriptRoot 'patch_reference.py') $taskReference
 if ($LASTEXITCODE -ne 0) { throw 'Reference extension failed' }
+& $Python (Join-Path $PSScriptRoot 'patch_diagnostic.py') $taskReference
+if ($LASTEXITCODE -ne 0) { throw 'Strict diagnostic extension failed' }
 Write-Output 'Pinned runtime/recompiler reference is ready. Supply your own extracted Captain Toad EUR files.'

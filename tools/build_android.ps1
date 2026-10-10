@@ -19,4 +19,4 @@ $taskBuild = Join-Path $taskRoot 'build\android-gamecode'
 if ($LASTEXITCODE -ne 0) { throw 'Android CMake configuration failed' }
 & $taskCMake --build $taskBuild --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw 'Android game-code compilation failed' }
-Write-Output 'Generated code compiled for Android ARM64. This static library is not a runnable game or APK.'
+Write-Output 'ARM64 library and boot diagnostic compiled. The diagnostic is headless; no game renderer or APK yet.'

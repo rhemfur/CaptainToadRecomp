@@ -1,0 +1,13 @@
+diff --git a/runtime/src/core.cpp b/runtime/src/core.cpp
+index b3829c0..065be93 100644
+--- a/runtime/src/core.cpp
++++ b/runtime/src/core.cpp
+@@ -342,2 +342,8 @@ PpcFunc hle_find_any(const char* name) {
+ extern "C" void hle_unimplemented(Cpu* c, const char* lib, const char* name) {
++#ifdef CT_DIAGNOSTIC_STRICT_HLE
++    log_msg("[ct-stop] missing HLE %s.%s r3=%08X r4=%08X r5=%08X lr=%08X", lib, name,
++            c->r[3], c->r[4], c->r[5], c->lr);
++    std::_Exit(78);
++#endif
++
+     static std::mutex m;
