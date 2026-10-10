@@ -1,28 +1,38 @@
-# Ambiente de teste Android
+# Android test environment
 
-Alvo inicial: Samsung Galaxy S25 Ultra (SM-S938B), consultado via ADB em 10/10/2026.
+Initial target: Samsung Galaxy S25 Ultra (SM-S938B), queried through ADB on October 10, 2026.
 
-| Item | Valor observado |
+| Item | Observed value |
 |---|---|
 | Android | 16, API 36 |
 | ABI | arm64-v8a |
 | SoC | Qualcomm/QTI SM8750 |
 | GPU | Adreno 830 |
-| Versão Vulkan anunciada pelo sistema | 1.3.0 |
-| ADB | Conectado e autorizado |
+| Vulkan version advertised by Android | 1.3.0 |
+| Vulkan version reported by the native probe | 1.3.284 |
+| ADB | Connected and authorized |
 
-O protótipo de código ARM64 usa Android API 33 como nível mínimo de compilação. Não é necessário mudar esse mínimo apenas porque o aparelho roda API 36.
+The ARM64 prototype uses Android API 33 as its build minimum. A device running API 36 does not by itself require changing that minimum.
 
-O boot de diagnóstico foi executado no aparelho até GX2Init, e a criação básica de instância/dispositivo Vulkan passou. Ainda faltam o renderer do jogo, desempenho, jogabilidade e integração do APK.
+## Verified behavior
 
-Quando houver mais de um dispositivo conectado, selecionar explicitamente o celular em todos os comandos: `adb -s <serial-local> ...`. O identificador do aparelho fica apenas em `local-reports/device-target.json`, excluído do Git; não publicá-lo.
+- The native diagnostic entered Captain Toad's startup code and reached `gx2.GX2Init`.
+- Vulkan instance and logical device creation passed on the system driver.
+- Native tests passed for SHA-256 vectors, fast-mutex recursion/ownership/same-core contention, filesystem reads and synthetic save round trips, and MCP/UC records.
+- Five runtime CTest cases passed on Windows; 17 existing reference recompiler tests passed.
 
-Próxima validação no aparelho: inicialização da aplicação, criação do dispositivo Vulkan e coleta de logs de falhas. Em seguida, menu e primeira fase, áudio, toque/controle, save/load e pausa/retomada. Registrar resultados medidos; não inferir FPS a partir de outro jogo.
+These results do not validate the game's renderer, graphics, audio, real saves, performance or gameplay. APK integration remains unfinished.
 
-## Marco de diagnóstico de boot — 10/10/2026
+## Device selection and local files
 
-O código recompilado entrou no boot no Galaxy S25 Ultra e no Windows. As primeiras dependências foram resolvidas com serviços de debugger/clocks, OSFastMutex, filesystem e MCP/UC. O boot atual chega a `gx2.GX2Init`; ainda não há imagem ou APK jogável.
+When multiple Android devices are connected, select the phone explicitly in every command: `adb -s <local-device-id> ...`.
 
-No S25 Ultra, criação de instância Vulkan 1.3 e dispositivo lógico foi verificada, com Adreno 830 reportando API 1.3.284. Passaram testes de SHA-256, concorrência/recursão de mutex, arquivos/saves sintéticos e registros MCP/UC. Cinco testes CTest também passaram no Windows; os 17 testes existentes do recompilador passaram. Logs e binários são locais e não foram publicados.
+The local device identifier is stored in `local-reports/device-target.json`, which is excluded from Git. Do not publish it. Diagnostic logs and binaries also remain local.
 
-Próximo trabalho: integrar GX2 e o renderer Vulkan para chegar à primeira imagem. Consultar README para os comandos reproduzíveis e limitações atuais.
+The device script uses `/data/local/tmp/captain-toad`. Filesystem tests use a synthetic fixture, separate from the game files. A headless diagnostic does not require installing an APK.
+
+## Next validation
+
+Integrate GX2 and the Vulkan renderer to obtain the first image. Then verify the menu, first level, audio, touch/controller input, real save/load behavior and suspend/resume. Report measured performance rather than inferring frame rates from another game.
+
+See `README.md` for reproducible commands and current runtime limitations.

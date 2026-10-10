@@ -1,30 +1,35 @@
-# Referências e licenças
+# Third-party references and licenses
 
 ## ZeldaWWHDRecomp
 
-- Fonte: https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp
-- Commit de referência: `defb89f21607345e2e97b2c145a071a3f362640c`.
-- Licença: Mozilla Public License 2.0.
-- O arquivo `patches/recompiler-hook-paths.patch` modifica `tools/recomp/recomp.py` para aceitar uma lista explícita de hooks. Mantém o padrão original quando o argumento é omitido.
-- O checkout `upstream/` é obtido separadamente. Seus arquivos, licenças e créditos de terceiros permanecem nesse checkout. Não estão incorporados no histórico deste repositório.
-- O projeto Android de ZeldaWWHDRecomp inclui contribuições de rhemfur, que também é o proprietário deste projeto.
+- Source: https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp
+- Pinned reference commit: `defb89f21607345e2e97b2c145a071a3f362640c`.
+- License: Mozilla Public License 2.0.
+- `patches/recompiler-hook-paths.patch` modifies `tools/recomp/recomp.py` to accept an explicit hook list. Omitting the argument preserves the original behavior.
+- `patches/strict-diagnostic-hle.patch` modifies `runtime/src/core.cpp` only when `CT_DIAGNOSTIC_STRICT_HLE` is enabled.
+- The `upstream/` checkout is downloaded separately. Its files, licenses and third-party credits remain in that checkout and are not incorporated into this repository's history.
+- ZeldaWWHDRecomp's Android integration includes contributions by rhemfur, who also owns this project.
+
+## Adapted diagnostic runtime components
+
+- `runtime/filesystem.cpp` adapts ZeldaWWHDRecomp's `runtime/src/hle/fs.cpp` under MPL-2.0, removing Zelda's mod/language redirections and restricting paths and writes.
+- `runtime/coreinit_boot.cpp` adapts debugger and clock queries from the same project's `coreinit_misc.cpp`.
+- Fast-mutex, MCP and UC layouts/behavior were researched in Cemu's MPL-2.0 source:
+  - [coreinit_Thread.h](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Thread.h)
+  - [coreinit_Synchronization.cpp](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Synchronization.cpp)
+  - [coreinit_MCP.h](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.h)
+  - [coreinit_MCP.cpp](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.cpp)
 
 ## cdecrypt
 
-- Fonte: https://github.com/VitaSmith/cdecrypt
-- Commit usado na extração local inicial: `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
-- Ferramenta de extração obtida e compilada separadamente. Nenhum código ou binário de cdecrypt está incluído neste repositório.
-- Consulte a licença e os créditos no projeto original antes de redistribuir essa ferramenta.
+- Source: https://github.com/VitaSmith/cdecrypt
+- Commit used for the initial local extraction: `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
+- The extractor was obtained and compiled separately. No cdecrypt source or binary is included in this repository.
+- Consult the original project's license and credits before redistributing that tool.
 
 ## cttt-decomp
 
-- Fonte: https://github.com/shibbo/cttt-decomp
-- Referência de pesquisa da versão Switch. Não foi incorporado código desse projeto neste protótipo.
+- Source: https://github.com/shibbo/cttt-decomp
+- Research reference for the Switch version. No source from this project has been incorporated into the prototype.
 
-## Componentes adaptados no runtime de diagnóstico
-
-- `runtime/filesystem.cpp` adapta `runtime/src/hle/fs.cpp` de ZeldaWWHDRecomp (MPL-2.0), removendo os redirecionamentos de mods/idiomas de Zelda e restringindo caminhos/escritas.
-- `runtime/coreinit_boot.cpp` adapta as consultas de debugger e clocks de `coreinit_misc.cpp` da mesma base.
-- `patches/strict-diagnostic-hle.patch` modifica `runtime/src/core.cpp` exclusivamente quando `CT_DIAGNOSTIC_STRICT_HLE` está ativo.
-- Os layouts e comportamentos de fast mutex, MCP e UC foram consultados na fonte de Cemu, MPL-2.0: https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Thread.h , https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_Synchronization.cpp , https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.h e coreinit_MCP.cpp.
-- Nenhum código da versão Switch nem assets Nintendo foi adicionado.
+No Nintendo game assets or generated game code are included in this repository.

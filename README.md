@@ -1,10 +1,12 @@
-# Captain Toad EUR — protótipo de recompilação para Android
+# Captain Toad EUR — Android recompilation prototype
 
-Projeto iniciado em `C:\DEV\Captain Toad` em 10/10/2026. O alvo inicial é a edição Wii U EUR com update interno v16. O executável já foi traduzido, compilado e entrou no boot em diagnóstico nativo no Windows e no Galaxy S25 Ultra. O boot atualmente para em GX2Init: ainda não há imagem, menu, jogabilidade ou APK.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, then stops at `gx2.GX2Init`. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
 
-## Preparar uma nova cópia do projeto
+The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
-Requisitos: Git, Python 3.10 ou mais recente e, para compilar ARM64, Android SDK com NDK/CMake/Ninja. O protótipo foi validado no Windows com Python 3.11.
+## Set up the project
+
+Requirements: Git, Python 3.10 or later and, for ARM64 builds, an Android SDK with NDK, CMake and Ninja. The prototype was tested on Windows with Python 3.11.
 
 ```powershell
 git clone https://github.com/rhemfur/CaptainToadRecomp.git
@@ -12,11 +14,11 @@ cd CaptainToadRecomp
 powershell -ExecutionPolicy Bypass -File tools/setup_reference.ps1
 ```
 
-O script baixa o commit fixado do runtime/recompilador e aplica a extensão de hooks. Ele preserva um checkout existente e recusa alterar uma versão diferente automaticamente.
+The setup script downloads the pinned runtime/recompiler commit and applies the hook-list and strict diagnostic extensions. It preserves an existing checkout and refuses to change a different revision automatically.
 
-Forneça suas próprias cópias de Captain Toad Wii U EUR e update v16, extraídas separadamente com as pastas `code/content/meta`. Um extrator compatível com pacotes NUS é o [cdecrypt](https://github.com/VitaSmith/cdecrypt). As ferramentas deste repositório não incluem jogo, tickets, chaves ou o extrator.
+Supply your own Captain Toad Wii U EUR game and v16 update, extracted separately into `code/content/meta` directory trees. [cdecrypt](https://github.com/VitaSmith/cdecrypt) supports NUS installation packages. This repository does not include the game, tickets, keys or the extractor.
 
-Depois de colocar as duas árvores em `work/extracted/base` e `work/extracted/update`:
+Place the extracted trees in `work/extracted/base` and `work/extracted/update`, then run:
 
 ```powershell
 python tools/prepare_game.py --base work/extracted/base --update work/extracted/update --output game --manifest local-reports/game-manifest.json
@@ -25,115 +27,110 @@ python tools/recompile.py
 powershell -ExecutionPolicy Bypass -File tools/build_android.ps1
 ```
 
-Os diretórios de saída da preparação e da geração devem estar vazios. Os comandos geram uma biblioteca estática e um executável de diagnóstico sem interface gráfica. Eles ainda não geram APK ou jogo jogável.
+Preparation and generation require empty output directories. These commands produce a static library and a headless diagnostic executable. They do not produce a playable game or APK.
 
-## Estrutura
+## Repository layout
 
-- `tools/`: preparação da cópia atualizada, auditoria do RPX, geração de C e build ARM64.
-- `profiles/captain-toad-eur-v16.json`: identificação por SHA-256 do RPX atualizado, sem hooks de Zelda.
-- `upstream/`: checkout local de ZeldaWWHDRecomp, mantido como referência e ignorado no repositório deste projeto.
-- `work/extracted/base` e `work/extracted/update`: extrações separadas dos pacotes originais.
-- `game/`: cópia efetiva, com os arquivos do update sobre os caminhos correspondentes da base.
-- `local-reports/`: manifesto de cópia e auditoria detalhada dos imports.
-- `build/gen/`: C gerado localmente do jogo.
-- `runtime/`: diagnóstico, APIs de startup, fast mutex, filesystem e testes.
-- `build/android-gamecode/`: biblioteca estática ARM64 e executável `ct-diagnostic`.
+- `tools/`: game preparation, RPX auditing, C generation, builds and device diagnostics.
+- `profiles/captain-toad-eur-v16.json`: SHA-256 identification of the updated RPX, with no Zelda hooks.
+- `runtime/`: startup services, fast mutex, filesystem, diagnostic executable and tests.
+- `upstream/`: separately downloaded ZeldaWWHDRecomp reference checkout, ignored by Git.
+- `work/extracted/base` and `work/extracted/update`: separate local game/update extractions.
+- `game/`: effective game tree, with update files replacing matching base paths.
+- `local-reports/`: local manifests, import audits and diagnostic logs.
+- `build/gen/`: C generated locally from the game executable.
+- `build/android-gamecode/`: ARM64 static library and `ct-diagnostic` executable.
 
-Os arquivos de jogo, tickets, chaves, código derivado do jogo e builds são ignorados pelo Git. Permanecem na máquina. Um APK futuro que incorpore esse código gerado exige o mesmo cuidado de distribuição da base original.
+Game files, tickets, keys, generated game code, builds and local reports are excluded from Git. Keep them on your machine. Executables or future APKs containing recompiled game code must not be included in public releases.
 
-## Referências fixadas
+## Pinned references
 
-- ZeldaWWHDRecomp: `defb89f21607345e2e97b2c145a071a3f362640c`, https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp . Licença MPL-2.0 preservada no checkout.
-- Extrator cdecrypt: `0ca58c66b0f23309c69b691caf6d39bf8868d96d`, https://github.com/VitaSmith/cdecrypt . Compilado localmente em `work/cdecrypt`, com a licença original preservada.
+- [ZeldaWWHDRecomp](https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp), commit `defb89f21607345e2e97b2c145a071a3f362640c`. Its MPL-2.0 license and credits remain in the reference checkout.
+- [cdecrypt](https://github.com/VitaSmith/cdecrypt), commit `0ca58c66b0f23309c69b691caf6d39bf8868d96d`, used for the initial local extraction. Its original license remains in the separate `work/cdecrypt` checkout.
 
-O checkout Zelda recebeu uma extensão pequena em `tools/recomp/recomp.py`: o argumento opcional `hook_paths` mantém o comportamento original quando omitido e permite passar `[]` explicitamente. Esse protótipo sempre usa `[]`; nenhum endereço/hook específico de Zelda é aplicado a Captain Toad. `tools/patch_reference.py` reproduz essa alteração e recusa um formato de fonte inesperado.
+The reference recompiler accepts an optional `hook_paths` argument. Omitting it preserves the original behavior; passing `[]` explicitly disables all hooks. This prototype always uses `[]`, so Zelda-specific addresses and hooks are not applied to Captain Toad. `tools/patch_reference.py` reproduces this extension and rejects an unexpected source layout.
 
-## Estado identificado
+## Executable identification and translation
 
-- Executável: `Kinopio.rpx`, versão atualizada, SHA-256 `3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464`.
+- Updated executable: `Kinopio.rpx`.
+- SHA-256: `3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464`.
 - Entry point: `0x02511BB0`.
-- Texto descomprimido: 5.746.620 bytes.
-- Código gerado: 45.773 funções em 48 unidades C; zero hooks de jogo e zero hooks de instrução.
-- Imports: 362 funções e 8 objetos de dados, distribuídos por 12 bibliotecas.
-- A auditoria lexical encontrou definições diretas para 300 funções e não encontrou para 62. Isso não confirma correção nem ligação final: macros, aliases e condições de compilação precisam de verificação.
-- Tradução sinalizou 36 palavras com opcode principal 0. Os pontos continuam chamando `ppc_unimplemented`; não foram alterados para NOP. É necessário determinar se são dados/padding ou caminhos executáveis.
-- A análise encontrou duas chamadas a símbolo indefinido, que também permanecem diagnósticos explícitos.
+- Decompressed text: 5,746,620 bytes.
+- Generated code: 45,773 functions in 48 C translation units, with no game or instruction hooks.
+- Imports: 362 functions and 8 data objects across 12 libraries.
+- The initial lexical audit of the reference runtime found direct definitions for 300 functions and none for 62. This is a source inventory, not proof of correct behavior or successful linking; macros, aliases and build conditions require further checks. Captain Toad adapters added since that audit resolve some of those gaps.
+- Translation reported 36 words with primary opcode 0. They still call `ppc_unimplemented`; they have not been replaced with NOPs. Their reachability and possible use as embedded data or padding remain to be investigated.
+- Two calls to undefined symbols remain explicit diagnostics.
 
-Boot de diagnóstico confirmado no Android e no Windows, até a chamada GX2Init. Vulkan: criação de instância e dispositivo lógico confirmada no S25 Ultra, Adreno 830, API 1.3.284. Isso não valida o renderer do jogo. Sem confirmação de menu, gráficos, áudio, saves reais ou jogabilidade.
+Diagnostic startup is confirmed on Android and Windows through the call to `GX2Init`. On the S25 Ultra, Vulkan instance and logical device creation passed; the Adreno 830 driver reported API 1.3.284. This does not validate the game's renderer, menus, audio, real saves or gameplay.
 
-## Reproduzir a geração
+## Regenerate local outputs
 
-Os pacotes locais foram extraídos com cdecrypt, usando sempre um diretório de destino separado; as pastas em Downloads não foram modificadas.
+The initial packages were extracted into separate destination directories without modifying the originals.
 
-Se for necessário refazer a cópia efetiva, use um novo diretório vazio de saída:
+To rebuild the effective game tree, use a new empty output directory:
 
 ```powershell
 python tools/prepare_game.py --base work/extracted/base --update work/extracted/update --output game-new --manifest local-reports/game-new-manifest.json
 python tools/audit_rpx.py --game game-new --upstream upstream --output local-reports/rpx-new-audit.json
 ```
 
-Para gerar novamente o C, use um novo diretório vazio:
+To regenerate C, use a new empty directory:
 
 ```powershell
 python tools/patch_reference.py upstream
 python tools/recompile.py --output build/gen-new
 ```
 
-O gerador recusa um executável com SHA-256 diferente do perfil identificado. Não selecionar a edição USA de Zelda para contornar essa verificação.
+The generator rejects an RPX whose SHA-256 differs from the identified profile. Do not select Zelda's USA profile to bypass this check.
 
-Para compilar o C inicial com as ferramentas já instaladas:
+The default Android build uses SDK `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2`, Android API 33 and ABI `arm64-v8a`. These are prototype build parameters, not a list of verified compatible devices.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/build_android.ps1
-```
-
-Esse comando usa SDK `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2`, Android API 33 e ABI `arm64-v8a`. Esses são os parâmetros do protótipo, não uma lista de aparelhos já compatíveis.
-
-Testes existentes do upstream:
+Run the existing reference recompiler tests with:
 
 ```powershell
 python -m unittest discover -s upstream/tools/recomp -p test_builds.py
 ```
 
-## Executar o diagnóstico
+## Run the diagnostic
 
-A versão nativa verifica o SHA-256 do RPX antes de carregar a memória, configura os imports de dados e inicia as threads de Captain Toad. Sem renderer, áudio, snapshots ou hooks de Zelda. Uma API ausente encerra o diagnóstico com código 78; um limite de 10 segundos encerra com 124.
+The native diagnostic verifies the RPX SHA-256 before loading guest memory, initializes data imports and starts Captain Toad's guest threads. It has no renderer, audio backend, snapshots or Zelda hooks. An unsupported API stops it with exit code 78; the default ten-second deadline stops it with 124.
 
-Windows, usando o Clang/MSYS2 e o CMake instalados:
+On Windows, using the installed Clang/MSYS2 and CMake:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/build_windows.ps1
 build/windows-diagnostic/ct-diagnostic.exe --game game --seconds 10
 ```
 
-Android, com depuração USB autorizada. Informe o identificador local de `adb devices`; não o publique:
+On Android, authorize USB debugging and use the local identifier from `adb devices`. Do not publish device identifiers:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/build_android.ps1
-powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Serial <identificador-local> -Mode Vulkan
-powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Serial <identificador-local> -Mode Boot
+powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Serial <local-device-id> -Mode Vulkan
+powershell -ExecutionPolicy Bypass -File tools/run_android_diagnostic.ps1 -Serial <local-device-id> -Mode Boot
 ```
 
-O script usa exclusivamente `/data/local/tmp/captain-toad` e seleciona o dispositivo explicitamente. Os logs ficam em `local-reports/`, fora do Git. Não é necessário instalar APK para esse diagnóstico. O executável contém código recompilado do jogo e permanece local; não criar releases com ele.
+The device script uses `/data/local/tmp/captain-toad` and selects the device explicitly. Logs remain in `local-reports/`, outside Git. This diagnostic does not require installing an APK. Its executable contains recompiled game code and stays local.
 
-Outros modos do script: `SelfTest`, `Mutex`, `Filesystem`, `System` e `Verify`. Testes de filesystem usam conteúdo e save sintéticos, separados dos arquivos do jogo.
+Other script modes are `SelfTest`, `Mutex`, `Filesystem`, `System` and `Verify`. Filesystem tests use synthetic content and save files in a separate fixture directory.
 
-Estado da validação em 10/10/2026:
+Validation on October 10, 2026:
 
-- Cinco testes CTest passaram no Windows: vetores SHA-256, mutex com concorrência no mesmo núcleo emulado, leitura/escrita/limites de filesystem, MCP/UC e recusa de RPX desconhecido.
-- No S25 Ultra passaram os testes nativos de SHA-256, fast mutex, filesystem e MCP/UC. O teste Vulkan criou uma instância e um dispositivo lógico.
-- Após as APIs de startup serem implementadas, o boot chegou a `gx2.GX2Init`. Inicialização gráfica e renderização permanecem pendentes.
+- Five CTest cases passed on Windows: SHA-256 vectors, same-core mutex contention, filesystem reads/writes/bounds, MCP/UC records and rejection of an unknown RPX.
+- Native SHA-256, fast mutex, filesystem and MCP/UC tests passed on the S25 Ultra. The Vulkan probe created an instance and a logical device.
+- With startup services implemented, the diagnostic reached `gx2.GX2Init`. Graphics initialization and rendering remain unfinished.
 
-## Próxima etapa: GX2 e renderer Vulkan
+## Next step: GX2 and Vulkan rendering
 
-Integrar as APIs GX2 e a fila de rendering genérica, separando as dependências de mods, câmera e interpolação de Zelda. Começar pela primeira chamada real, `GX2Init`, e avançar até a primeira imagem. Depois integrar áudio, controles, saves reais e embalagem do APK.
+Integrate GX2 APIs and the generic rendering queue while separating Zelda's mod, camera and interpolation dependencies. Start at the first graphics call, `GX2Init`, and work toward the first rendered image. Audio, controls, real saves and APK packaging follow.
 
-Limitações atuais: `_iob` ainda não tem ABI de streams implementado; callbacks importados de exceção/atexit permanecem nulos; palavras de opcode 0 e chamadas indefinidas continuam explícitas; só três chaves UC são suportadas, com inglês como idioma inicial e região EU. Configurações desconhecidas param o diagnóstico. Filas de posse/priority inheritance de fast mutex e saves de estado ainda não foram implementados.
+Current limitations: `_iob` has no implemented stream ABI; imported exception/atexit callbacks remain null; unsupported words and undefined calls remain explicit failures; only three UC settings are supported, with English and an EUR virtual console as the initial configuration. Unknown settings stop the diagnostic. Fast-mutex ownership queues, priority inheritance and save states are not implemented.
 
-A decompilação Switch pode ajudar a nomear funções equivalentes, mas não foi incorporado código desse projeto.
+The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 
-## Licença e créditos
+## License and credits
 
-Ferramentas e alterações deste projeto: MPL-2.0, conforme `LICENSE`. A base de recompilação/runtime é ZeldaWWHDRecomp e conserva sua licença e seus créditos no checkout separado; ver `THIRD_PARTY_NOTICES.md`.
+Project tools and modifications are licensed under MPL-2.0; see `LICENSE`. ZeldaWWHDRecomp provides the reference recompiler/runtime and retains its original license and third-party credits in the separate checkout. See `THIRD_PARTY_NOTICES.md`.
 
-Projeto de fãs independente, sem afiliação com a Nintendo. Os nomes dos jogos e consoles identificam a compatibilidade pretendida. Este repositório publica ferramentas, metadados de identificação e documentação; os arquivos do jogo e seu código gerado permanecem locais.
+This is an independent fan project, not affiliated with Nintendo. Game and console names identify intended compatibility. The repository contains tools, runtime source, identification metadata and documentation; game files and generated game code remain local.

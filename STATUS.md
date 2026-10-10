@@ -1,29 +1,30 @@
-# Captain Toad Android: primeiro marco
+# Captain Toad Android: development status
 
-Trabalho realizado em 10/10/2026, em `C:\DEV\Captain Toad`.
+Updated October 10, 2026. Local workspace: `C:\DEV\Captain Toad`.
 
-**Resultado: executável EU com update v16 traduzido para C e compilado para Android ARM64. Ainda não há um jogo executável nem APK.**
+**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra, then stops at `gx2.GX2Init`. There is no rendered game, playable APK or gameplay validation yet.**
 
-## Concluído
+## Completed
 
-- Base pública ZeldaWWHDRecomp clonada no diretório autorizado, sem modificar o projeto Zelda já existente.
-- Pacotes de Captain Toad extraídos separadamente para `work/extracted/base` e `work/extracted/update`, preservando os originais em Downloads.
-- Cópia atualizada criada em `game/`: 1.572 arquivos; 124 caminhos da base substituídos pelo update. Todos os hashes das cópias foram verificados contra a respectiva origem extraída.
-- Executável identificado: `Kinopio.rpx`, SHA-256 `3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464`.
-- Perfil `CT-EUR-v16` criado com identidade de endereços e zero hooks de Zelda.
-- Geradas 45.773 funções, em 48 unidades C.
-- Compilação concluída com NDK 30.0.16248370 / Clang 21, ABI arm64-v8a e Android API 33.
-- Objetos ELF64/AArch64 verificados; produzida `build/android-gamecode/libcaptain_toad_gamecode.a` (447.912.254 bytes).
-- Passaram os 17 testes existentes de identificação e mapeamento de builds do recompilador.
-- Repositório local iniciado; jogo, código gerado, builds e relatórios locais excluídos pelo `.gitignore`. O primeiro marco foi validado localmente; a publicação do projeto contém apenas ferramentas, metadados e documentação.
+- Downloaded the pinned ZeldaWWHDRecomp reference without modifying the existing Zelda project.
+- Extracted the EUR base game and v16 update separately, preserving the original packages.
+- Prepared an effective game tree with 1,572 files, replacing 124 base paths with update files. Every copied file was hash-checked against its extracted source.
+- Identified `Kinopio.rpx`, SHA-256 `3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464`.
+- Created profile `CT-EUR-v16` with an identity address map and no Zelda hooks.
+- Generated 45,773 functions in 48 C translation units and compiled them for Android ARM64.
+- Built and ran a headless diagnostic using generic memory, loader and thread components.
+- Added debugger/clock queries, fast mutex, filesystem and MCP/UC startup services.
+- Verified Vulkan instance and logical device creation on the S25 Ultra; Adreno 830 reported API 1.3.284.
+- Passed five runtime CTest cases on Windows, native hash/mutex/filesystem/system tests on Android, and 17 existing reference recompiler tests.
+- Published source, tools, profiles and documentation. Game files, generated code, logs, binaries and device identifiers remain local and excluded from Git.
 
-SHA-256 da biblioteca estática local: `457f4f386460d4250950b5a8d496fd22d0c14935c43d601a910274e81c52b30a`.
+The initial ARM64 static library was built with NDK `30.0.16248370`, Clang 21, API 33 and ABI `arm64-v8a`. Its initial size was 447,912,254 bytes and SHA-256 was `457f4f386460d4250950b5a8d496fd22d0c14935c43d601a910274e81c52b30a`. Later runtime builds are separate artifacts.
 
-## Auditoria inicial
+## Initial import audit
 
-Encontrados 370 imports: 362 funções e 8 objetos de dados. A busca lexical encontrou definições diretas no runtime para 300 funções. Os 62 imports abaixo ainda exigem análise de implementação/aliases:
+The original lexical audit of the reference runtime found 370 imports: 362 functions and 8 data objects. It found direct source definitions for 300 functions. The following table records the 62 functions without a direct definition at that initial stage; some now have Captain Toad adapters.
 
-| Biblioteca | Funções sem definição direta encontrada |
+| Library | Functions without a direct definition in the initial audit |
 |---|---:|
 | gx2 | 16 |
 | coreinit | 11 |
@@ -34,34 +35,29 @@ Encontrados 370 imports: 362 funções e 8 objetos de dados. A busca lexical enc
 | snd_core | 3 |
 | nn_save | 3 |
 
-Presença de uma definição não comprova comportamento correto ou disponibilidade na ligação Android. Ausência nesta busca não exclui definições geradas por macros. Os 8 imports de dados precisam de uma auditoria específica do loader.
+A source definition does not prove correct behavior or availability in an Android build. This lexical scan can miss macro-generated definitions. Data imports also require loader-specific validation.
 
-O tradutor sinalizou 36 palavras com opcode principal 0 e duas chamadas a símbolos indefinidos. Continuam gerando diagnósticos explícitos; não foram substituídos por funções vazias. É necessário investigar se as palavras são padding/dados internos ou caminhos executáveis.
+The translator reported 36 words with primary opcode 0 and two calls to undefined symbols. They remain explicit diagnostics. Further analysis must establish whether those words are reachable instructions or embedded data/padding.
 
-## Próximo marco
+## Next milestone
 
-Adaptar o loader e a composição do runtime para Captain Toad, retirar as dependências de hooks e recursos de Zelda, resolver as APIs necessárias para boot e obter menu/primeira fase. Depois integrar o aplicativo Android e validar controles, áudio, save e pausa/retomada em aparelho real.
+Integrate GX2 with the Vulkan renderer and obtain the first rendered image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
 
-A biblioteca estática contém código gerado compilado e ainda pode referenciar símbolos externos: a ligação do runtime e a execução permanecem por fazer. Compilação bem-sucedida não comprova compatibilidade ou correção do jogo.
+Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
-## Arquivos principais no diretório de trabalho
+## Main project files
 
-- `README.md`: estado atual e comandos reproduzíveis.
-- `CMakeLists.txt`: alvo de biblioteca estática Android.
-- `profiles/captain-toad-eur-v16.json`: perfil do RPX identificado.
-- `tools/prepare_game.py`: criação e verificação da árvore atualizada.
-- `tools/audit_rpx.py`: inventário de seções, relocations e imports.
-- `tools/recompile.py`: geração sem hooks de Zelda e com conferência do SHA-256.
-- `tools/build_android.ps1`: compilação usando o SDK/NDK instalado.
-- `patches/recompiler-hook-paths.patch`: extensão pequena e reproduzível no recompilador de referência.
-- `local-reports/game-manifest.json` e `local-reports/rpx-audit.json`: resultados detalhados locais.
+- `README.md`: setup, commands, validation and current limitations.
+- `TESTING.md`: verified Android test environment.
+- `CMakeLists.txt`: static game-code library and headless diagnostic targets.
+- `profiles/captain-toad-eur-v16.json`: identified executable profile.
+- `runtime/`: diagnostic runtime services and tests.
+- `tools/prepare_game.py`: effective tree preparation and copy verification.
+- `tools/audit_rpx.py`: sections, relocations and import inventory.
+- `tools/recompile.py`: generation with SHA-256 validation and no Zelda hooks.
+- `tools/build_android.ps1` and `tools/build_windows.ps1`: reproducible builds.
+- `tools/run_android_diagnostic.ps1`: explicit-device ADB deployment and tests.
+- `patches/`: reference hook-list and strict-HLE extensions.
+- `local-reports/`: detailed manifests, audits and logs, kept outside Git.
 
-Referências preservadas: ZeldaWWHDRecomp `defb89f21607345e2e97b2c145a071a3f362640c`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
-
-## Marco de diagnóstico de boot — 10/10/2026
-
-O código recompilado entrou no boot no Galaxy S25 Ultra e no Windows. As primeiras dependências foram resolvidas com serviços de debugger/clocks, OSFastMutex, filesystem e MCP/UC. O boot atual chega a `gx2.GX2Init`; ainda não há imagem ou APK jogável.
-
-No S25 Ultra, criação de instância Vulkan 1.3 e dispositivo lógico foi verificada, com Adreno 830 reportando API 1.3.284. Passaram testes de SHA-256, concorrência/recursão de mutex, arquivos/saves sintéticos e registros MCP/UC. Cinco testes CTest também passaram no Windows; os 17 testes existentes do recompilador passaram. Logs e binários são locais e não foram publicados.
-
-Próximo trabalho: integrar GX2 e o renderer Vulkan para chegar à primeira imagem. Consultar README para os comandos reproduzíveis e limitações atuais.
+Pinned references: ZeldaWWHDRecomp `defb89f21607345e2e97b2c145a071a3f362640c`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
