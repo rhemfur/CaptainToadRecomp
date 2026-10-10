@@ -26,6 +26,11 @@ int ct_system_test() {
     ok=ok && invoke("UCReadSysConfig",{uc,1,record})==0 && ld32(value)==1 &&
        ld32(value+4)==0xAABBCCDD && ld32(record+0x54)==0x11223344 && ld32(record+0x48)==0;
     invoke("UCClose",{uc});
-    LOG("[ct-test] MCP/UC handles/EUR layout/bounds/system-info/debugger: %s",ok?"PASS":"FAIL");
+    auto initialize=hle_find("nn_act","Initialize__Q2_2nn3actFv"),slot=hle_find("nn_act","GetSlotNo__Q2_2nn3actFv");
+    if (!initialize || !slot) fatal("[ct-test] missing nn_act export");
+    cpu.r[3]=0xFFFFFFFF; initialize(&cpu); ok=ok && cpu.r[3]==0;
+    cpu.r[3]=0xFFFFFFFF; initialize(&cpu); ok=ok && cpu.r[3]==0;
+    slot(&cpu); ok=ok && cpu.r[3]==1;
+    LOG("[ct-test] MCP/UC handles/EUR layout/bounds/system-info/debugger/act: %s",ok?"PASS":"FAIL");
     return ok?0:1;
 }

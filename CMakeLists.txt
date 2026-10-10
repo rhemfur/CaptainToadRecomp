@@ -34,7 +34,7 @@ if(CT_BUILD_DIAGNOSTIC)
   add_executable(ct-diagnostic
     runtime/diagnostic.cpp runtime/vulkan_device.cpp ${CT_GX2_SOURCES} runtime/coreinit_boot.cpp runtime/fast_mutex.cpp runtime/mutex_test.cpp
     runtime/filesystem.cpp runtime/filesystem_test.cpp
-    runtime/mcp.cpp runtime/uc.cpp runtime/system_test.cpp
+    runtime/mcp.cpp runtime/uc.cpp runtime/act.cpp runtime/system_test.cpp
     "${REFERENCE_DIR}/runtime/src/core.cpp"
     "${REFERENCE_DIR}/runtime/src/threads.cpp"
     "${REFERENCE_DIR}/runtime/src/hle/coreinit_mem.cpp"
