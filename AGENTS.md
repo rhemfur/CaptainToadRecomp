@@ -4,4 +4,4 @@ Use English for all public repository documentation, code comments, user-facing 
 
 Keep game dumps, tickets, keys, generated game code, diagnostic logs, device identifiers and compiled game binaries local and excluded from Git. Publish only tools, runtime source, identification metadata and documentation.
 
-Describe verified behavior accurately. With the full reference runtime the game renders its title screen, opening cutscene and episode book menu on Windows ARM64, then waits for input; stream-out output is not produced yet; this is not a playable game or APK. Do not claim graphics, performance or gameplay compatibility without testing it.
+Describe verified behavior accurately. With the full reference runtime the game plays its first level on Windows ARM64 with SDL input and saves; stream-out output is not produced yet and longer play is untested; this is not a playable game or APK. Do not claim graphics, performance or gameplay compatibility without testing it.

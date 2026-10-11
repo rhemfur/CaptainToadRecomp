@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it renders the title screen, the opening cutscene and the episode book menu through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer and SDL output running (not yet checked by ear). It then waits at the menu for controller input. The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Gameplay, controls, saves, Android rendering and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it plays on a Windows ARM64 Snapdragon X PC: the title screen, the opening cutscene, the episode book and the first level render through Vulkan at about 60 frames per second, the reference's SDL input drives the menus and moves Captain Toad, and progress is saved. Its audio mixer and SDL output run (not yet checked by ear). The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Stream-out output, a full playthrough, Android rendering and APK packaging remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -141,11 +141,13 @@ powershell -ExecutionPolicy Bypass -File tools/build_game_windows.ps1
 build/game-windows/wwhd.exe --game game
 ```
 
-On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued to the episode book menu, about 4,000 frames after startup, where it waits for input. A 90-second run hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
+On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued to the episode book menu, about 4,000 frames after startup. Idle at the book, it plays its attract demo of the first level, collecting coins, gems and the Power Star.
 
-## Next step: input, stream-out output and Android
+Input was checked with the reference's scripted test input, timed from the book (`WWHD_TEST_ORIGIN=4000`): A opens the book at Plucky Pass Beginnings, a second A starts the level, and holding the left stick walks Captain Toad away from the start, collecting four coins. The same script without the stick leaves him at the start with no coins. The game writes `save/user/GameData.bin` next to the executable. Runs of up to 140 seconds, including a level, hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
 
-Drive the menu with controller input and reach the first level. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
+## Next step: stream-out output, a longer playthrough and Android
+
+Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
 
 The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 

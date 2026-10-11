@@ -2,7 +2,7 @@
 
 Updated October 10, 2026.
 
-**Linked with the full reference game runtime, Captain Toad renders its title screen, opening cutscene and episode book menu through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer running (not yet checked by ear), and waits at the menu for input. There is no controller input, gameplay validation, Android rendering or APK yet. The headless diagnostic also enters the startup code on the Galaxy S25 Ultra.**
+**Linked with the full reference game runtime, Captain Toad plays its first level on a Windows ARM64 Snapdragon X PC: menus, cutscenes and the level render through Vulkan at about 60 frames per second, SDL input moves Captain Toad and progress is saved. Its audio mixer runs (not yet checked by ear). Stream-out output, a full playthrough, Android rendering and an APK are not done yet. The headless diagnostic also enters the startup code on the Galaxy S25 Ultra.**
 
 ## Completed
 
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Drive the menu with controller input, produce stream-out output on the GPU, then work toward the first playable level and an Android build of the same runtime. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
+Play further levels with a real controller, produce stream-out output on the GPU, then work toward the first playable level and an Android build of the same runtime. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -74,5 +74,5 @@ HiZ follows Cemu: the size query reports 0x1000 bytes with 0x100 alignment and e
 
 `tools/build_game_windows.ps1` links the generated code with the pinned reference runtime: native GX2, the Vulkan renderer and Cemu-derived shader decompiler, SDL3 host and AX audio. `tools/patch_runtime.py` points the loader at `Kinopio.rpx`, stubs Wind Waker HD guest symbols, invalidates every Wind Waker HD canonical address (`CT_FOREIGN_GUEST`) and fixes two reference behaviors that Captain Toad exposed: `OSWaitRendezvous` now waits for the cores in its mask, and CPU surface copies identify depth surfaces by their usage flag rather than the float-format bit. `runtime/reference_hle.cpp` and appended blocks add the missing imports, following Cemu.
 
-On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized audio and worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. Its Super Mario 3D World save lookup reports no save. Stream-out buffers, strides, offsets and contexts follow Cemu's command semantics, but the renderer skips the rasterizer-killed stream-out draws, so their output is not produced. The game reaches the episode book menu and waits for input; a 90-second run hit no missing import.
+On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized audio and worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. Its Super Mario 3D World save lookup reports no save. Stream-out buffers, strides, offsets and contexts follow Cemu's command semantics, but the renderer skips the rasterizer-killed stream-out draws, so their output is not produced. The game reaches the episode book menu; scripted input opens the book, starts Plucky Pass Beginnings and walks Captain Toad with the left stick, compared against the same run without the stick. Idle at the book, the attract demo plays through the first level. The save is written to `save/user/GameData.bin`; runs of up to 140 seconds hit no missing import.
 
