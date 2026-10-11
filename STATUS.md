@@ -1,8 +1,8 @@
 # Captain Toad Android: development status
 
-Updated October 10, 2026. Local workspace: `C:\DEV\Captain Toad`.
+Updated October 10, 2026.
 
-**The native diagnostic enters Captain Toad's startup code on Windows and the Galaxy S25 Ultra and passes GX2 initialization and graphics resource preparation. On Windows ARM64 it also passes depth-buffer HiZ queries, `nn_act` startup, shader GPR queries and vertex shader binding, then stops at `padscore.WPADEnableURCC`. There is no rendered game, playable APK or gameplay validation yet.**
+**Linked with the full reference game runtime, Captain Toad renders its title screen and opening cutscene through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer running (not yet checked by ear), and stops at `gx2.GX2SetStreamOutBuffer` after 1,500–4,000 frames. There is no controller input, gameplay validation, Android rendering or APK yet. The headless diagnostic also enters the startup code on the Galaxy S25 Ultra.**
 
 ## Completed
 
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Provide the controller startup calls beginning with `padscore.WPADEnableURCC` and integrate shader translation, drawing and presentation to obtain the first game image, then work toward the menu and first playable level. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
+Implement stream-out buffers and contexts, reach the title menu with controller input, then work toward the first playable level and an Android build of the same runtime. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -69,3 +69,10 @@ Implemented generic register state, display-list recording/replay, context switc
 Six Windows CTest cases passed. GX2 resource tests also passed on the S25 Ultra, including tiled-copy round trips and overlapping ranges. A synthetic Vulkan clear/readback matched 256/256 expected RGBA pixels on both Adreno 830 and the desktop RTX 2080 Ti. The game performed a 16x8 CPU-backed surface copy during startup.
 
 HiZ follows Cemu: the size query reports 0x1000 bytes with 0x100 alignment and enable requests change no host state. On Windows ARM64 the boot passed those queries for every depth buffer, initialized `nn_act` with one local account in slot 1, started the file-loading, decompression and save-data threads, answered the shader GPR and stack-entry queries (including a vertex shader header at a 2-byte-aligned address), bound vertex shader registers and stopped at `padscore.WPADEnableURCC`. Tessellated fetch shaders and unsupported draw operations remain explicit failures. Game shader translation and presentation are not implemented. All transferred content/meta assets passed SHA-256 verification on the phone.
+
+## Full reference runtime
+
+`tools/build_game_windows.ps1` links the generated code with the pinned reference runtime: native GX2, the Vulkan renderer and Cemu-derived shader decompiler, SDL3 host and AX audio. `tools/patch_runtime.py` points the loader at `Kinopio.rpx`, stubs Wind Waker HD guest symbols, invalidates every Wind Waker HD canonical address (`CT_FOREIGN_GUEST`) and fixes two reference behaviors that Captain Toad exposed: `OSWaitRendezvous` now waits for the cores in its mask, and CPU surface copies identify depth surfaces by their usage flag rather than the float-format bit. `runtime/reference_hle.cpp` and appended blocks add the missing imports, following Cemu.
+
+On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized audio and worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. Its Super Mario 3D World save lookup reports no save. The run stops at `gx2.GX2SetStreamOutBuffer`; the frame varies between runs.
+

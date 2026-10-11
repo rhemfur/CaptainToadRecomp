@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. The headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra, initializes a Vulkan device, configures its TV buffer and prepares graphics resources. On Windows ARM64 it also prepares depth buffers, initializes its account service, starts its file-loading, decompression and save-data threads, queries and binds its shaders' registers, then stops at `padscore.WPADEnableURCC` while configuring controllers. Graphics, menus, gameplay, audio and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it renders the title screen and the opening cutscene through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer and SDL output running (not yet checked by ear), then stops at `gx2.GX2SetStreamOutBuffer`. The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Gameplay, controls, saves, Android rendering and APK packaging remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -33,13 +33,14 @@ Preparation and generation require empty output directories. These commands prod
 
 - `tools/`: game preparation, RPX auditing, C generation, builds and device diagnostics.
 - `profiles/captain-toad-eur-v16.json`: SHA-256 identification of the updated RPX, with no Zelda hooks.
-- `runtime/`: startup services, fast mutex, filesystem, GX2 bridge, headless Vulkan device and tests.
+- `runtime/`: startup services, fast mutex, filesystem, GX2 bridge, headless Vulkan device and tests; `reference_hle.cpp` adds imports to the full reference runtime.
 - `upstream/`: separately downloaded ZeldaWWHDRecomp reference checkout, ignored by Git.
 - `work/extracted/base` and `work/extracted/update`: separate local game/update extractions.
 - `game/`: effective game tree, with update files replacing matching base paths.
 - `local-reports/`: local manifests, import audits and diagnostic logs.
 - `build/gen/`: C generated locally from the game executable.
 - `build/android-gamecode/`: ARM64 static library and `ct-diagnostic` executable.
+- `build/game-windows/`: the reference game runtime linked with Captain Toad's code (`wwhd.exe`).
 
 Game files, tickets, keys, generated game code, builds and local reports are excluded from Git. Keep them on your machine. Executables or future APKs containing recompiled game code must not be included in public releases.
 
@@ -121,15 +122,31 @@ Validation on October 10, 2026:
 - Native SHA-256, fast mutex, filesystem and MCP/UC tests passed on the S25 Ultra. The Vulkan probe created an instance and a logical device.
 - The diagnostic passes `GX2Init` and configures the game's 1280x720 TV scan buffer. It prepares surfaces, fetch descriptors, samplers and render-target registers. A later Windows ARM64 run passed the HiZ queries for every depth buffer, including two that request HiZ, initialized `nn_act`, answered the shader GPR and stack-entry queries, bound vertex shader registers and stopped at `padscore.WPADEnableURCC`.
 
-## Next step: shaders and presentation
+## Run the game runtime (Windows)
 
-Provide the controller startup calls beginning with `padscore.WPADEnableURCC`, then integrate shader translation, draw submission and scanout presentation to obtain the first game image. Audio, controls, real saves and APK packaging follow. The current bridge stops on unsupported drawing commands.
+`tools/build_game_windows.ps1` builds the pinned reference runtime with Captain Toad's generated code: its native GX2, Vulkan renderer with the Cemu-derived shader decompiler, SDL3 window/input host and AX audio. `tools/patch_runtime.py` prepares the `upstream/` checkout first:
 
-Current graphics limitations: only the verified TV scan mode 3 and RGBA8 and sRGB RGBA8 scan-buffer formats are supported; tessellated fetch shaders and geometry shaders stop the diagnostic. Vertex and pixel shader binding forwards the registers stored in each GX2 shader structure; shader programs are not translated yet. HiZ follows Cemu: `GX2CalcDepthBufferHiZInfo` reports a fixed 0x1000-byte buffer with 0x100 alignment and HiZ enable requests change no host state, because host depth evaluation never reads HTILE data. Surface copies currently operate on CPU-backed guest memory; MSAA and GPU-written game surfaces require additional work. No game frame has been rendered.
+- The loader opens `Kinopio.rpx`.
+- Wind Waker HD guest symbols that the runtime names get weak stubs, following nsmbu-recomp. A stub stops through `ppc_unimplemented` if it runs. The script refuses a symbol that matches a Captain Toad function, because the game's function would silently replace the stub.
+- With `CT_FOREIGN_GUEST`, every Wind Waker HD canonical address is invalid, even inside Captain Toad's ranges. Features that check validity switch off; direct uses resolve into the protected null page and fault instead of reading unrelated game data. The audio mixer's fader lookup now checks validity.
+- `OSWaitRendezvous` waits for the cores in its mask, as Cemu does. The reference counted arrivals, which let the main thread use the sound system before the audio launch thread had initialized it.
+- CPU surface copies identify depth surfaces by their depth-buffer usage flag, not by the 0x800 float-format bit, so R16G16 float copies work.
+- `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state, stream-out enable and tessellation levels.
 
-Other limitations: `_iob` has no implemented stream ABI; imported exception/atexit callbacks remain null; unsupported words and undefined calls remain explicit failures; `nn_act` exposes one local account in slot 1; only three UC settings are supported, with English and an EUR virtual console as the initial configuration. Unknown settings stop the diagnostic. Fast-mutex ownership queues, priority inheritance and save states are not implemented.
+The build is strict: it stops at the first missing import. Tested with llvm-mingw 20260922 (aarch64), the Visual Studio Build Tools CMake/Ninja and Vulkan headers:
 
-The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build_game_windows.ps1
+build/game-windows/wwhd.exe --game game
+```
+
+On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued. After 1,500–4,000 frames it stopped at `gx2.GX2SetStreamOutBuffer`; the exact frame varies between runs. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
+
+## Next step: stream out, input and Android
+
+Implement stream-out buffers and contexts in the renderer, then reach the title menu with controller input. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
+
+The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 
 ## License and credits
 

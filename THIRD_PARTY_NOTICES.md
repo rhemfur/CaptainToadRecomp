@@ -20,6 +20,12 @@
   - [coreinit_MCP.h](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.h)
   - [coreinit_MCP.cpp](https://github.com/cemu-project/Cemu/blob/main/src/Cafe/OS/libs/coreinit/coreinit_MCP.cpp)
 
+## Full reference runtime build
+
+- `tools/patch_runtime.py` modifies the separate `upstream/` checkout (MPL-2.0) before `tools/build_game_windows.ps1` builds it: the executable name, Wind Waker HD guest address handling, `OSWaitRendezvous`, CPU surface-copy depth detection, crash reports and appended exports. Those changes stay in that checkout.
+- Its weak guest stubs follow [nsmbu-recomp](https://github.com/IrishBruse/nsmbu-recomp) `tools/recomp/guest_stubs.py` (MPL-2.0); no file from that project is copied.
+- `runtime/reference_hle.cpp` and the appended exports follow Cemu's MPL-2.0 sources: `padscore.cpp`, `coreinit_Misc.cpp`, `snd_user.cpp`, `ax_aux.cpp`, `mic.cpp`, `nn_nfp.cpp`, `nn_save.cpp`, `GX2_State.cpp`, `GX2_Streamout.cpp` and `coreinit_Synchronization.cpp`.
+
 ## cdecrypt
 
 - Source: https://github.com/VitaSmith/cdecrypt
