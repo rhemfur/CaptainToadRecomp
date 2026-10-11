@@ -145,6 +145,17 @@ On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the ga
 
 Input was checked with the reference's scripted test input, timed from the book (`WWHD_TEST_ORIGIN=4000`): A opens the book at Plucky Pass Beginnings, a second A starts the level, and holding the left stick walks Captain Toad away from the start, collecting four coins. The same script without the stick leaves him at the start with no coins. The game writes `save/user/GameData.bin` next to the executable. Runs of up to 140 seconds, including a level, hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
 
+## Build the Android test APK
+
+`tools/build_game_android.ps1` builds the same runtime with the NDK as the reference Android app's `libmain.so` (with SDL3, libc++ and the AdrenoTools hooks), then a private APK with Gradle. `tools/patch_runtime.py` gives the app its own package, `org.ctrecomp.captaintoad`, and name, so it never replaces a Wind Waker HD install. `tools/run_game_android.ps1` installs it on the phone named by `-Serial` or `local-reports/device-target.json`, copies the prepared game tree with `-PushGame`, starts it and saves `adb logcat -s wwhd` to `local-reports/android-game.log`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build_game_android.ps1 -Cpu oryon-1
+powershell -ExecutionPolicy Bypass -File tools/run_game_android.ps1 -PushGame
+```
+
+The scripts default to the SDK in `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2` and Android Studio's JDK. They have not been run yet. The APK contains recompiled game code: keep it on your own devices.
+
 ## Next step: stream-out output, a longer playthrough and Android
 
 Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.

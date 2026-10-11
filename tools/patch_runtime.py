@@ -131,6 +131,14 @@ static void execute_op(Op op, const uint32* p, uint32 n) {
          'fopen((config::game_dir + "/code/Kinopio.rpx").c_str(), "rb")'),
     ],
 }
+# The Android app gets its own package and name, so installing it never replaces a Wind Waker HD
+# install. The Java namespace stays; only the installed identity changes.
+REPLACEMENTS['../android/app/build.gradle'] = [
+    ('        applicationId "org.wwhdrecomp.wwhd"\n', '        applicationId "org.ctrecomp.captaintoad"\n'),
+]
+REPLACEMENTS['../android/app/src/main/res/values/strings.xml'] = [
+    ('    <string name="app_name">Wind Waker HD</string>\n', '    <string name="app_name">Captain Toad</string>\n'),
+]
 REPLACEMENTS['../CMakeLists.txt'] = [
     ('target_include_directories(wwhd PRIVATE runtime/include runtime/src runtime/src/gx2)\n',
      'target_include_directories(wwhd PRIVATE runtime/include runtime/src runtime/src/gx2)\n'
