@@ -1,8 +1,8 @@
 # Captain Toad Android: development status
 
-Updated October 10, 2026.
+Updated October 11, 2026.
 
-**Linked with the full reference game runtime, Captain Toad plays its first level on a Windows ARM64 Snapdragon X PC: menus, cutscenes and the level render through Vulkan at about 60 frames per second, SDL input moves Captain Toad and progress is saved. Its audio mixer runs (not yet checked by ear). Stream-out output, a full playthrough, Android rendering and an APK are not done yet. The headless diagnostic also enters the startup code on the Galaxy S25 Ultra.**
+**Linked with the full reference game runtime, Captain Toad plays its first level on a Windows ARM64 Snapdragon X PC: menus, cutscenes and the level render through Vulkan at about 60 frames per second, SDL input moves Captain Toad and progress is saved. Its audio mixer runs (not yet checked by ear). A private test APK of the same runtime runs on the Galaxy S25 Ultra: it renders the first level at 43–60 frames per second, a game controller connected to the phone plays it, and it saves; touch controls and audio on the phone are not checked yet. Stream-out output and a full playthrough are not done yet.**
 
 ## Completed
 
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Play further levels with a real controller, produce stream-out output on the GPU, then work toward the first playable level and an Android build of the same runtime. Audio, controls, real saves, suspend/resume behavior and APK packaging remain to be validated.
+Play further levels with a real controller, produce stream-out output on the GPU, add small on-screen touch controls for the phone, and check audio, suspend/resume and longer play on the S25 Ultra.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -76,3 +76,8 @@ HiZ follows Cemu: the size query reports 0x1000 bytes with 0x100 alignment and e
 
 On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized audio and worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. Its Super Mario 3D World save lookup reports no save. Stream-out buffers, strides, offsets and contexts follow Cemu's command semantics, but the renderer skips the rasterizer-killed stream-out draws, so their output is not produced. The game reaches the episode book menu; scripted input opens the book, starts Plucky Pass Beginnings and walks Captain Toad with the left stick, compared against the same run without the stick. Idle at the book, the attract demo plays through the first level. The save is written to `save/user/GameData.bin`; runs of up to 140 seconds hit no missing import.
 
+## Android test APK
+
+`tools/build_game_android.ps1` builds the reference runtime with Captain Toad's code as the reference Android app's `libmain.so`, packaged as `org.ctrecomp.captaintoad` so it never replaces a Wind Waker HD install. `tools/run_game_android.ps1` installs it, copies the game tree, refuses a locked phone and saves both the logcat output and the runtime's `captures/wwhd.log`.
+
+On October 11, 2026, on the S25 Ultra (Android 16, Adreno 830, Vulkan 1.3.284) the game loaded its archives, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin`. A 120-second run reached about 6,600 frames at 49–60 swaps per second (another run dipped to 43) with no missing import; screen captures show the first level and its Power Star scene, played with a game controller connected to the phone. The game looks up the error viewer's `ErrEulaSetVersion`, `ErrEulaPlayAppearSE` and `ErrEulaJump` through `OSDynLoad_FindExport`; the first two now change nothing, as in Cemu, and a jump stops. A call to any other unresolved dynamic export now stops the strict build instead of returning 0. A locked screen pauses the app and Samsung's process freezer stops it. Touch controls, audio output, suspend/resume and longer play on the phone remain unchecked.

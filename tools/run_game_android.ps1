@@ -38,9 +38,23 @@ if ($PushGame) {
         Invoke-CtAdb push (Join-Path $taskRoot "game\$taskDir") "$taskFiles/game/"
     }
 }
+# A locked screen pauses the activity at once, and Samsung's process freezer then stops the game.
+Invoke-CtAdb shell input keyevent KEYCODE_WAKEUP
+if ((& $taskAdb -s $Serial shell dumpsys window) -match 'isKeyguardShowing=true') {
+    throw 'The phone is locked: unlock it, keep the screen on and run this script again'
+}
+Invoke-CtAdb shell am force-stop $taskPackage
+# On Android the runtime writes captures/wwhd.log only when env.txt (read at startup) asks for it,
+# and a path given there must already have its folder.
+Invoke-CtAdb shell mkdir -p "$taskFiles/captures"
+& $taskAdb -s $Serial shell "test -e $taskFiles/env.txt || echo WWHD_LOG_FILE=captures/wwhd.log > $taskFiles/env.txt"
 Invoke-CtAdb logcat -c
 Invoke-CtAdb shell monkey -p $taskPackage -c android.intent.category.LAUNCHER 1
 Start-Sleep -Seconds $LogSeconds
 $taskLog = Join-Path $taskRoot 'local-reports\android-game.log'
-& $taskAdb -s $Serial logcat -d -s wwhd SDL AndroidRuntime DEBUG > $taskLog
-Write-Output "Log saved to $taskLog (adb logcat -s wwhd). The runtime also writes $taskFiles/captures/wwhd.log."
+# Windows PowerShell's > writes UTF-16; keep the log UTF-8 like the runtime's own.
+& $taskAdb -s $Serial logcat -d -s wwhd SDL AndroidRuntime DEBUG | Out-File -LiteralPath $taskLog -Encoding utf8
+$taskRuntimeLog = Join-Path $taskRoot 'local-reports\android-wwhd.log'
+& $taskAdb -s $Serial pull "$taskFiles/captures/wwhd.log" $taskRuntimeLog
+if ($LASTEXITCODE -ne 0) { Write-Warning "The runtime has not written $taskFiles/captures/wwhd.log" }
+Write-Output "Logs saved to $taskLog (adb logcat -s wwhd) and $taskRuntimeLog (captures/wwhd.log)."

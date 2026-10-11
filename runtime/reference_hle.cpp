@@ -56,6 +56,18 @@ HLE(mic, MICInit) {
     ret(c, uint32_t(-1));
 }
 
+// ---------------------------------------------------------------- erreula
+// Captain Toad finds these through OSDynLoad_FindExport. Cemu registers none of them: its lookup
+// hands out an unsupported-import stub that returns without doing anything. The reference error
+// viewer is never drawn and has one layout, so the version and the appear sound change nothing.
+HLE(erreula, ErrEulaSetVersion__3RplFi) { LOG("[ct-erreula] ErrEulaSetVersion(%d): one viewer layout", (int32_t)arg(c, 0)); }
+HLE(erreula, ErrEulaPlayAppearSE__3RplFb) {}
+// (url or title argument, length): leaving the game for another application is not supported.
+HLE(erreula, ErrEulaJump__3RplFPCcUi) {
+    fatal("[ct-stop] erreula.ErrEulaJump(%s, %u): jumping to another application is not supported",
+          arg(c, 0) ? mem::read_cstr(arg(c, 0)).c_str() : "", arg(c, 1));
+}
+
 // ---------------------------------------------------------------- nn_nfp (amiibo)
 // The reader initializes and searches but never detects a figure.
 namespace {

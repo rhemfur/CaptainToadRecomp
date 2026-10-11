@@ -130,6 +130,16 @@ static void execute_op(Op op, const uint32* p, uint32 n) {
         ('fopen((config::game_dir + "/code/cking.rpx").c_str(), "rb")',
          'fopen((config::game_dir + "/code/Kinopio.rpx").c_str(), "rb")'),
     ],
+    # A dynamic export without HLE returned 0 when called, as Cemu's unsupported-import stub does.
+    # The strict build stops there instead, like a missing static import.
+    'src/hle/coreinit_misc.cpp': [
+        ('            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[dynload] call to unimplemented dynamic export (lr=%08X)", c->lr); c->r[3] = 0; };\n',
+         '#ifdef CT_DIAGNOSTIC_STRICT_HLE\n'
+         '            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[ct-stop] missing HLE dynamic export (lr=%08X; see FindExport above)", c->lr); std::_Exit(78); };\n'
+         '#else\n'
+         '            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[dynload] call to unimplemented dynamic export (lr=%08X)", c->lr); c->r[3] = 0; };\n'
+         '#endif\n'),
+    ],
 }
 # The Android app gets its own package and name, so installing it never replaces a Wind Waker HD
 # install. The Java namespace stays; only the installed identity changes.
@@ -145,6 +155,11 @@ REPLACEMENTS['../CMakeLists.txt'] = [
      '# Captain Toad runtime services the reference runtime lacks (CaptainToadRecomp tools/patch_runtime.py)\n'
      'set(CT_EXTRA_SOURCES "" CACHE STRING "Captain Toad runtime sources added to the game executable")\n'
      'target_sources(wwhd PRIVATE ${CT_EXTRA_SOURCES})\n'),
+    # SHELL: splits on spaces, so a checkout path with a space broke the forced include.
+    ('target_compile_options(cemu_latte PRIVATE "SHELL:-include ${CEMU_DIR}/cemu_shim.h")\n',
+     'target_compile_options(cemu_latte PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
+    ('target_compile_options(shadertest PRIVATE "SHELL:-include ${CEMU_DIR}/cemu_shim.h")\n',
+     'target_compile_options(shadertest PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
 ]
 # Exports that read state private to a reference source file are appended to that file.
 APPENDS = {

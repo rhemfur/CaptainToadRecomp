@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it plays on a Windows ARM64 Snapdragon X PC: the title screen, the opening cutscene, the episode book and the first level render through Vulkan at about 60 frames per second, the reference's SDL input drives the menus and moves Captain Toad, and progress is saved. Its audio mixer and SDL output run (not yet checked by ear). The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Stream-out output, a full playthrough, Android rendering and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it plays on a Windows ARM64 Snapdragon X PC: the title screen, the opening cutscene, the episode book and the first level render through Vulkan at about 60 frames per second, the reference's SDL input drives the menus and moves Captain Toad, and progress is saved. Its audio mixer and SDL output run (not yet checked by ear). A private test APK of the same runtime runs on a Samsung Galaxy S25 Ultra: it renders the first level at 43–60 frames per second, a game controller connected to the phone plays it, and it saves; touch controls and audio on the phone are not checked yet. Stream-out output and a full playthrough remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -131,10 +131,10 @@ Validation on October 10, 2026:
 - With `CT_FOREIGN_GUEST`, every Wind Waker HD canonical address is invalid, even inside Captain Toad's ranges. Features that check validity switch off; direct uses resolve into the protected null page and fault instead of reading unrelated game data. The audio mixer's fader lookup now checks validity.
 - `OSWaitRendezvous` waits for the cores in its mask, as Cemu does. The reference counted arrivals, which let the main thread use the sound system before the audio launch thread had initialized it.
 - CPU surface copies identify depth surfaces by their depth-buffer usage flag, not by the 0x800 float-format bit, so R16G16 float copies work.
-- `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state and tessellation levels.
+- `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, the error viewer's version and appear sound (found through `OSDynLoad_FindExport`; a jump to another application stops), no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state and tessellation levels.
 - Stream out follows Cemu's command semantics: `GX2SetStreamOutBuffer` sets each buffer's base and size, `GX2SetVertexShader` sets the vertex strides, `GX2SetStreamOutContext` and `GX2SaveStreamOutContext` reset, load or save the write offset on the render thread in command order, and each stream-out draw advances the offsets by the bytes its vertices emit. The renderer still skips those rasterizer-killed draws, so their vertex output is not produced and the buffers keep their previous contents. The first such draw logs this.
 
-The build is strict: it stops at the first missing import. Tested with llvm-mingw 20260922 (aarch64), the Visual Studio Build Tools CMake/Ninja and Vulkan headers:
+The build is strict: it stops at the first missing import, including a call to a dynamic export that `OSDynLoad_FindExport` could not resolve (the reference, like Cemu, returned 0 there). Tested with llvm-mingw 20260922 (aarch64), the Visual Studio Build Tools CMake/Ninja and Vulkan headers:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/build_game_windows.ps1
@@ -154,11 +154,15 @@ powershell -ExecutionPolicy Bypass -File tools/build_game_android.ps1 -Cpu oryon
 powershell -ExecutionPolicy Bypass -File tools/run_game_android.ps1 -PushGame
 ```
 
-The scripts default to the SDK in `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2` and Android Studio's JDK. They have not been run yet. The APK contains recompiled game code: keep it on your own devices.
+The scripts default to the SDK in `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2` and the JDK in `JAVA_HOME`, else Android Studio's (`-JavaHome` overrides it). The APK contains recompiled game code: keep it on your own devices.
+
+The run script wakes the phone and stops if it is locked: a locked screen pauses the app at once and Samsung's process freezer then stops the game. It ends any earlier run, starts the app, waits `-LogSeconds` (default 60) and also pulls the runtime's own `captures/wwhd.log`, which the Android runtime writes only when `env.txt` in the app folder sets `WWHD_LOG_FILE`; the script creates that `env.txt` if the phone has none.
+
+On October 11, 2026, the APK was built on a Windows x64 PC (Microsoft JDK 21, Gradle 8.12) and run on the Galaxy S25 Ultra (SM-S938B, Android 16, Adreno 830 with Vulkan 1.3.284). The game loaded `Kinopio.rpx` and its archives, started its worker and audio threads, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin` in the app folder. A 120-second run reached about 6,600 frames at 49–60 swaps per second with no missing import; screen captures show the first level and its Power Star scene. During that run the first level was played with a game controller connected to the phone. Touch controls, audio output, suspend/resume and longer play on the phone have not been checked yet. The reference's settings overlay (still named Wind Waker HD) opens over the game; its save states depend on Wind Waker HD addresses and must not be used.
 
 ## Next step: stream-out output, a longer playthrough and Android
 
-Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
+Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. On Android, add small on-screen touch controls, then check audio, suspend/resume and longer play on the S25 Ultra.
 
 The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 
