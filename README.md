@@ -1,6 +1,6 @@
 # Captain Toad EUR — Android recompilation prototype
 
-Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it renders the title screen and the opening cutscene through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer and SDL output running (not yet checked by ear), then stops at `gx2.GX2SetStreamOutBuffer`. The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Gameplay, controls, saves, Android rendering and APK packaging remain unfinished.
+Captain Toad Wii U EUR with internal update version 16 has been translated and compiled into native code. Linked with the full reference game runtime, it renders the title screen, the opening cutscene and the episode book menu through Vulkan at about 60 frames per second on a Windows ARM64 Snapdragon X PC, with its audio mixer and SDL output running (not yet checked by ear). It then waits at the menu for controller input. The separate headless diagnostic enters the game's startup code on Windows and a Samsung Galaxy S25 Ultra. Gameplay, controls, saves, Android rendering and APK packaging remain unfinished.
 
 The project started on October 10, 2026. All public documentation, code comments, commit messages and GitHub discussions for this project should use English.
 
@@ -131,7 +131,8 @@ Validation on October 10, 2026:
 - With `CT_FOREIGN_GUEST`, every Wind Waker HD canonical address is invalid, even inside Captain Toad's ranges. Features that check validity switch off; direct uses resolve into the protected null page and fault instead of reading unrelated game data. The audio mixer's fader lookup now checks validity.
 - `OSWaitRendezvous` waits for the cores in its mask, as Cemu does. The reference counted arrivals, which let the main thread use the sound system before the audio launch thread had initialized it.
 - CPU surface copies identify depth surfaces by their depth-buffer usage flag, not by the 0x800 float-format bit, so R16G16 float copies work.
-- `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state, stream-out enable and tessellation levels.
+- `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state and tessellation levels.
+- Stream out follows Cemu's command semantics: `GX2SetStreamOutBuffer` sets each buffer's base and size, `GX2SetVertexShader` sets the vertex strides, `GX2SetStreamOutContext` and `GX2SaveStreamOutContext` reset, load or save the write offset on the render thread in command order, and each stream-out draw advances the offsets by the bytes its vertices emit. The renderer still skips those rasterizer-killed draws, so their vertex output is not produced and the buffers keep their previous contents. The first such draw logs this.
 
 The build is strict: it stops at the first missing import. Tested with llvm-mingw 20260922 (aarch64), the Visual Studio Build Tools CMake/Ninja and Vulkan headers:
 
@@ -140,11 +141,11 @@ powershell -ExecutionPolicy Bypass -File tools/build_game_windows.ps1
 build/game-windows/wwhd.exe --game game
 ```
 
-On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued. After 1,500–4,000 frames it stopped at `gx2.GX2SetStreamOutBuffer`; the exact frame varies between runs. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
+On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued to the episode book menu, about 4,000 frames after startup, where it waits for input. A 90-second run hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
 
-## Next step: stream out, input and Android
+## Next step: input, stream-out output and Android
 
-Implement stream-out buffers and contexts in the renderer, then reach the title menu with controller input. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
+Drive the menu with controller input and reach the first level. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
 
 The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 

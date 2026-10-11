@@ -81,6 +81,51 @@ REPLACEMENTS = {
          '            std::to_string(uint32_t(s->format.value())) + " tile " + std::to_string(uint32_t(s->tileMode.value())) + " -> " +\n'
          '            std::to_string(uint32_t(d->format.value())) + " tile " + std::to_string(uint32_t(d->tileMode.value())));\n'),
     ],
+    # Stream out (Cemu GX2_Streamout.cpp, LatteCommandProcessor.cpp, LatteStreamoutGPU.cpp): context
+    # updates run on the render thread in command order; draws advance each buffer's write offset.
+    'src/gx2/gx2_cmd.h': [
+        ('    OP_LAYOUT_CONTENT,  // DrawSelf scope: clip TV menu content to the native layout region\n    OP_COUNT\n',
+         '    OP_LAYOUT_CONTENT,  // DrawSelf scope: clip TV menu content to the native layout region\n'
+         '    OP_STREAMOUT_UPDATE,  // buffer index, mode (0 reset, 2 load from context, 3 save to context), context\n'
+         '    OP_COUNT\n'),
+    ],
+    'src/gx2/gx2_core.cpp': [
+        ('static void execute_op(Op op, const uint32* p, uint32 n) {\n',
+         '''// Stream-out draws advance each buffer's write offset by the bytes their vertices emit, bounded by
+// the buffer (Cemu LatteStreamoutGPU.cpp). The renderer does not produce that output yet: the buffers
+// keep their previous contents.
+static void streamout_advance(uint32 count, uint32 instances) {
+    if (!g_regs[mmVGT_STRMOUT_EN]) return;
+    static bool logged = false;
+    if (!logged) { logged = true; LOG("[gx2] stream-out draws advance their buffer offsets; their vertex output is not produced yet"); }
+    for (uint32 i = 0; i < 4; i++) {
+        const uint32 stride = g_regs[mmVGT_STRMOUT_VTX_STRIDE_0 + i * 4] << 2, size = g_regs[mmVGT_STRMOUT_BUFFER_SIZE_0 + i * 4] << 2;
+        uint32& offset = g_regs[mmVGT_STRMOUT_BUFFER_OFFSET_0 + i * 4];
+        if (!stride || !size) continue;
+        offset += (uint32)std::min<uint64>(uint64(count) * instances * stride, offset < size ? size - offset : 0);
+    }
+}
+static void execute_op(Op op, const uint32* p, uint32 n) {
+'''),
+        ('    case OP_DRAW: render::draw(g_regs, p[0], p[1], 0, 0, p[2], p[3]); break;\n'
+         '    case OP_DRAW_INDEXED: render::draw(g_regs, p[0], p[1], p[2], p[3], p[4], p[5]); break;\n',
+         '    case OP_DRAW: render::draw(g_regs, p[0], p[1], 0, 0, p[2], p[3]); streamout_advance(p[1], p[3]); break;\n'
+         '    case OP_DRAW_INDEXED: render::draw(g_regs, p[0], p[1], p[2], p[3], p[4], p[5]); streamout_advance(p[1], p[5]); break;\n'
+         '    case OP_STREAMOUT_UPDATE: {  // IT_STRMOUT_BUFFER_UPDATE\n'
+         '        uint32& offset = g_regs[mmVGT_STRMOUT_BUFFER_OFFSET_0 + 4 * (p[0] & 3)];\n'
+         '        if (p[1] == 0) offset = 0;\n'
+         '        else if (p[1] == 2) offset = p[2] ? ld32(p[2]) : 0;\n'
+         '        else if (p[1] == 3 && p[2]) st32(p[2], offset);\n'
+         '        break;\n'
+         '    }\n'),
+    ],
+    'src/gx2/gx2_resources.cpp': [
+        ('        set_regs(mmSQ_VTX_SEMANTIC_0, &tmp[mmSQ_VTX_SEMANTIC_0], nsem);\n    }\n}\n',
+         '        set_regs(mmSQ_VTX_SEMANTIC_0, &tmp[mmSQ_VTX_SEMANTIC_0], nsem);\n    }\n'
+         '    if (ld32(vs + 0x110))  // usesStreamOut: per-buffer vertex strides in dwords (Cemu GX2_Shader.cpp)\n'
+         '        for (uint32 i = 0; i < 4; i++) set_reg(mmVGT_STRMOUT_VTX_STRIDE_0 + i * 4, ld32(vs + 0x114 + 4 * i) >> 2);\n'
+         '}\n'),
+    ],
     'src/savestate.cpp': [
         ('fopen((config::game_dir + "/code/cking.rpx").c_str(), "rb")',
          'fopen((config::game_dir + "/code/Kinopio.rpx").c_str(), "rb")'),
@@ -144,8 +189,21 @@ HLE(gx2, GX2SetPointLimits) {
     set_reg(REGADDR::PA_SU_POINT_MINMAX, LATTE_PA_SU_POINT_MINMAX().set_MIN_SIZE(lo).set_MAX_SIZE(hi).getRawValue());
 }
 HLE(gx2, GX2SetPrimitiveRestartIndex) { set_reg(REGADDR::VGT_MULTI_PRIM_IB_RESET_INDX, arg(c, 0)); }
-// Stream out buffers and contexts are not exported, so enabling it stops at their first use.
 HLE(gx2, GX2SetStreamOutEnable) { set_reg(mmVGT_STRMOUT_EN, arg(c, 0) & 1); }
+HLE(gx2, GX2SetStreamOutBuffer) {
+    // (index, GX2StreamOutBuffer*): +0 size, +4 data, +0xC GX2RBuffer (elementSize +0x10, elementCount
+    // +0x14, data +0x18) used when data is null. BASE holds the full address (this renderer's convention).
+    uint32 i = arg(c, 0) & 3, b = arg(c, 1);
+    uint32 data = ld32(b + 4), size = ld32(b);
+    if (!data) { data = ld32(b + 0x18); size = ld32(b + 0x10) * ld32(b + 0x14); }
+    set_reg(mmVGT_STRMOUT_BUFFER_SIZE_0 + i * 4, size >> 2);
+    set_reg(mmVGT_STRMOUT_BUFFER_BASE_0 + i * 4, data);
+}
+// (index, GX2StreamOutBuffer*, reset): reset starts at offset 0, otherwise the offset its context saved
+HLE(gx2, GX2SetStreamOutContext) {
+    gx2::emit(gx2::OP_STREAMOUT_UPDATE, {arg(c, 0) & 3, arg(c, 2) ? 0u : 2u, ld32(arg(c, 1) + 0x1C)});
+}
+HLE(gx2, GX2SaveStreamOutContext) { gx2::emit(gx2::OP_STREAMOUT_UPDATE, {arg(c, 0) & 3, 3u, ld32(arg(c, 1) + 0x1C)}); }
 // Cemu exports no tessellation calls; draws never select tessellated primitives here, so the mode
 // changes nothing and the level registers only record the values.
 HLE(gx2, GX2SetTessellation) {}
