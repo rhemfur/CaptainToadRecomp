@@ -30,20 +30,23 @@ $taskBuild = Join-Path $taskRoot 'build\game-android'
 # Strict HLE stops at the first missing import; foreign-guest mode keeps Wind Waker HD addresses out.
 $taskFlags = '-DCT_DIAGNOSTIC_STRICT_HLE=1 -DCT_FOREIGN_GUEST=1'
 if ($Cpu -ne 'generic') { $taskFlags += " -mcpu=$Cpu" }
-$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
+$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp', 'ct_frame.cpp', 'ct_prompts.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
 & $taskCMake -S $taskUpstream -B $taskBuild -G Ninja "-DCMAKE_MAKE_PROGRAM=$taskNinja" `
     "-DCMAKE_TOOLCHAIN_FILE=$taskToolchain" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-33 `
     -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Release -DWWHD_BUNDLED_DEPS=ON `
     "-DCMAKE_C_FLAGS=$taskFlags" "-DCMAKE_CXX_FLAGS=$taskFlags" `
     "-DGEN_DIR=$((Join-Path $taskRoot 'build\gen') -replace '\\', '/')" "-DCT_EXTRA_SOURCES=$taskExtra"
 if ($LASTEXITCODE -ne 0) { throw 'Android game runtime configuration failed' }
-& $taskCMake --build $taskBuild --target wwhd --parallel $Jobs
+& $taskCMake --build $taskBuild --target wwhd wwhd_yaz0 --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw 'Android game runtime compilation failed' }
 
 $taskLibs = Join-Path $taskUpstream 'android\app\libs\arm64-v8a'
 New-Item -ItemType Directory -Force -Path $taskLibs | Out-Null
 & (Join-Path $taskLlvm 'bin\llvm-strip.exe') --strip-unneeded (Join-Path $taskBuild 'libmain.so') -o (Join-Path $taskLibs 'libmain.so')
 if ($LASTEXITCODE -ne 0) { throw 'Stripping libmain.so failed' }
+# the Yaz0 decoder the app's shader preparation loads
+& (Join-Path $taskLlvm 'bin\llvm-strip.exe') --strip-unneeded (Join-Path $taskBuild 'libyaz0.so') -o (Join-Path $taskLibs 'libyaz0.so')
+if ($LASTEXITCODE -ne 0) { throw 'Stripping libyaz0.so failed' }
 $taskSdl = Get-ChildItem -LiteralPath (Join-Path $taskBuild '_deps') -Recurse -Filter 'libSDL3.so' | Select-Object -First 1
 if (-not $taskSdl) { throw 'libSDL3.so was not built' }
 Copy-Item -LiteralPath $taskSdl.FullName -Destination $taskLibs -Force

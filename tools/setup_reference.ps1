@@ -2,7 +2,7 @@ param([string]$Python = 'python')
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $taskReference = Join-Path $taskRoot 'upstream'
-$taskCommit = 'defb89f21607345e2e97b2c145a071a3f362640c'
+$taskCommit = '59aa6ddeadd08b557a17743834a2d89a1d2dfc11'
 if (-not (Test-Path -LiteralPath $taskReference)) {
     & git init $taskReference
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialize reference checkout' }
@@ -21,4 +21,4 @@ if ($LASTEXITCODE -ne 0 -or $taskActualCommit.Trim() -ne $taskCommit) {
 if ($LASTEXITCODE -ne 0) { throw 'Reference extension failed' }
 & $Python (Join-Path $PSScriptRoot 'patch_diagnostic.py') $taskReference
 if ($LASTEXITCODE -ne 0) { throw 'Strict diagnostic extension failed' }
-Write-Output 'Pinned runtime/recompiler reference is ready. Supply your own extracted Captain Toad EUR files.'
+Write-Output 'Pinned runtime/recompiler reference is ready. Supply your own Captain Toad base game and v16 update (USA or EUR).'

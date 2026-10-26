@@ -1,0 +1,17 @@
+{
+  "name": "CT-USA-v16",
+  "title_id": "0005000010180600",
+  "update_title_id": "0005000e10180600",
+  "update_version": 16,
+  "rpx": "Kinopio.rpx",
+  "rpx_sha256": "45c65a67aa269750cb27774c63a41b26efa0cf9415fa86d80e11d66363230671",
+  "hooks": [
+    "02420F10",
+    "023734F8"
+  ],
+  "status": "identified-not-run",
+  "hook_notes": {
+    "02420F10": "per-frame function (game logic, drawing, TV/GamePad swap), called once a frame by the main loop: save states (runtime/ct_frame.cpp)",
+    "023734F8": "sets a layer camera's projection aspect from its viewport (the store Cemu's KinopioAspectUWv16 patch replaces): the TV aspect setting (runtime/ct_frame.cpp)"
+  }
+}
