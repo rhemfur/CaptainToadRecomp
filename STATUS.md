@@ -60,7 +60,7 @@ Reaching startup and compiling native code do not establish full game correctnes
 - `patches/`: reference hook-list and strict-HLE extensions.
 - `local-reports/`: detailed manifests, audits and logs, kept outside Git.
 
-Pinned references: ZeldaWWHDRecomp `defb89f21607345e2e97b2c145a071a3f362640c`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
+Pinned references: ZeldaWWHDRecomp `d23522eb1eb0fd676437a685016cf081f5ecf285`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
 
 ## GX2 resource bootstrap
 
@@ -81,3 +81,7 @@ On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized aud
 `tools/build_game_android.ps1` builds the reference runtime with Captain Toad's code as the reference Android app's `libmain.so`, packaged as `org.ctrecomp.captaintoad` so it never replaces a Wind Waker HD install. `tools/run_game_android.ps1` installs it, copies the game tree, refuses a locked phone and saves both the logcat output and the runtime's `captures/wwhd.log`.
 
 On October 11, 2026, on the S25 Ultra (Android 16, Adreno 830, Vulkan 1.3.284) the game loaded its archives, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin`. A 120-second run reached about 6,600 frames at 49–60 swaps per second (another run dipped to 43) with no missing import; screen captures show the first level and its Power Star scene, played with a game controller connected to the phone. The game looks up the error viewer's `ErrEulaSetVersion`, `ErrEulaPlayAppearSE` and `ErrEulaJump` through `OSDynLoad_FindExport`; the first two now change nothing, as in Cemu, and a jump stops. A call to any other unresolved dynamic export now stops the strict build instead of returning 0. A locked screen pauses the app and Samsung's process freezer stops it. Touch controls, audio output, suspend/resume and longer play on the phone remain unchecked.
+
+## Reference runtime moved to ZeldaWWHDRecomp d23522e
+
+On October 14, 2026, the pinned reference moved to ZeldaWWHDRecomp `d23522e`: its newer recompiler, worker pipeline compilation, frame pacing, Android surface recovery, on-screen controls and controller dead zones. Regeneration produced the same 45,773 functions and 362 used imports. The app's launcher starts the game when `game/code/Kinopio.rpx` is present, the on-screen controls are drawn at 70% of their size in the corners with a dark body, a finger dragged outside them turns the camera in place of the right stick, the settings menu hides Wind Waker HD's save states, mods, frame-rate choice and shader fixes, the launcher icon comes from the game's `meta/iconTex.tga`, and `runtime/phone_motion.cpp` feeds the phone's motion sensors to the gyro while Settings > Controls > Gyro is "controller" and no controller has motion sensors (default sensitivity 1.5). On the S25 Ultra the build played about 26,700 frames, to the fifth level with a GameSir G8+ controller, at a median of 59.5 swaps per second (35 at the lowest) with no missing import. On October 30, 2026, the on-screen controls, the camera drag and the phone's gyro were played on the S25 Ultra and judged right. Save import/export (still Wind Waker HD's `cking.sav`) remains unadapted, and the Windows ARM64 build has not been rebuilt on this reference.

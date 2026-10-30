@@ -30,7 +30,7 @@ $taskBuild = Join-Path $taskRoot 'build\game-android'
 # Strict HLE stops at the first missing import; foreign-guest mode keeps Wind Waker HD addresses out.
 $taskFlags = '-DCT_DIAGNOSTIC_STRICT_HLE=1 -DCT_FOREIGN_GUEST=1'
 if ($Cpu -ne 'generic') { $taskFlags += " -mcpu=$Cpu" }
-$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
+$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp', 'phone_motion.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
 & $taskCMake -S $taskUpstream -B $taskBuild -G Ninja "-DCMAKE_MAKE_PROGRAM=$taskNinja" `
     "-DCMAKE_TOOLCHAIN_FILE=$taskToolchain" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-33 `
     -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Release -DWWHD_BUNDLED_DEPS=ON `
@@ -54,6 +54,11 @@ foreach ($taskHook in @('main_hook', 'hook_impl', 'file_redirect_hook', 'gsl_all
     if (-not $taskHookFile) { throw "Missing AdrenoTools hook: $taskHook" }
     Copy-Item -LiteralPath $taskHookFile.FullName -Destination $taskLibs -Force
 }
+
+# The launcher icon comes from the game's own meta/iconTex.tga (the reference's android/make_icon.py
+# writes the git-ignored android/app/local-res, which app/build.gradle prefers to SDL's icon).
+& $Python (Join-Path $taskUpstream 'android\make_icon.py') (Join-Path $taskRoot 'game')
+if ($LASTEXITCODE -ne 0) { throw 'Game icon generation failed (needs Pillow: pip install pillow)' }
 
 if (-not $JavaHome) { $JavaHome = $env:JAVA_HOME }
 if (-not $JavaHome) { $JavaHome = 'C:\Program Files\Android\Android Studio\jbr' }

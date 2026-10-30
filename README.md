@@ -46,7 +46,7 @@ Game files, tickets, keys, generated game code, builds and local reports are exc
 
 ## Pinned references
 
-- [ZeldaWWHDRecomp](https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp), commit `defb89f21607345e2e97b2c145a071a3f362640c`. Its MPL-2.0 license and credits remain in the reference checkout.
+- [ZeldaWWHDRecomp](https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp), commit `d23522eb1eb0fd676437a685016cf081f5ecf285`. Its MPL-2.0 license and credits remain in the reference checkout.
 - [cdecrypt](https://github.com/VitaSmith/cdecrypt), commit `0ca58c66b0f23309c69b691caf6d39bf8868d96d`, used for the initial local extraction. Its original license remains in the separate `work/cdecrypt` checkout.
 
 The reference recompiler accepts an optional `hook_paths` argument. Omitting it preserves the original behavior; passing `[]` explicitly disables all hooks. This prototype always uses `[]`, so Zelda-specific addresses and hooks are not applied to Captain Toad. `tools/patch_reference.py` reproduces this extension and rejects an unexpected source layout.
@@ -160,9 +160,21 @@ The run script wakes the phone and stops if it is locked: a locked screen pauses
 
 On October 11, 2026, the APK was built on a Windows x64 PC (Microsoft JDK 21, Gradle 8.12) and run on the Galaxy S25 Ultra (SM-S938B, Android 16, Adreno 830 with Vulkan 1.3.284). The game loaded `Kinopio.rpx` and its archives, started its worker and audio threads, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin` in the app folder. A 120-second run reached about 6,600 frames at 49–60 swaps per second with no missing import; screen captures show the first level and its Power Star scene. During that run the first level was played with a game controller connected to the phone. Touch controls, audio output, suspend/resume and longer play on the phone have not been checked yet. The reference's settings overlay (still named Wind Waker HD) opens over the game; its save states depend on Wind Waker HD addresses and must not be used.
 
+### On the reference's current main
+
+On October 14, 2026, the pinned reference moved from `defb89f` to ZeldaWWHDRecomp `d23522e` for its newer recompiler (guest registers in C locals, condition-register liveness), Vulkan pipeline compilation on workers, frame pacing, Android surface recovery, on-screen controls and controller dead zones. Our patches apply unchanged except one reworded error report; none of Captain Toad's added imports exists in the reference yet. Regeneration produced the same 45,773 functions, 362 used imports and 36 primary-opcode-0 words. Additions for the Android app:
+
+- The reference's launcher activity starts the game when the PC route's game folder has `code/Kinopio.rpx` (it looked for Wind Waker HD's `cking.rpx`).
+- The reference's on-screen controls are drawn at 70% of their size, with a dark translucent body (white controls vanished on Captain Toad's white title screen), and kept in the corners in units of the screen's short side: the left stick and D-pad bottom left, A/B/X/Y close together bottom right, ZL/L and R/ZR at the top corners with -/+ under R/ZR. The right stick is replaced by a camera drag: a finger moved anywhere outside the controls turns the camera with its speed and stops when it stops; the touch still reaches the game.
+- `tools/build_game_android.ps1` makes the launcher icon from the game's own `meta/iconTex.tga` with the reference's `android/make_icon.py`.
+- The settings menu is titled Captain Toad and hides what only works with Wind Waker HD: the Saves tab (save states and crash recovery), the Mods tab, the frame-rate choice (interpolation from 30 logic steps; Captain Toad draws 60 itself) and the bloom and ambient-occlusion fixes. Holding - for half a second opens it.
+- `runtime/phone_motion.cpp` feeds the phone's gyroscope and accelerometer to the reference's motion module, turned to the screen's orientation, while Settings > Controls > Gyro is "controller" and no connected controller has motion sensors. The default gyro sensitivity is 1.5 (the reference's 0.5 needed the phone turned too far).
+
+On the S25 Ultra this build played about 26,700 frames (to the fifth level, with a GameSir G8+ controller) at a median of 59.5 swaps per second, 35 at the lowest, with no missing import. On October 30, 2026, the on-screen controls, the camera drag and the phone's gyro at sensitivity 1.5 were played on the S25 Ultra and judged right. The reference's save import and export still look for Wind Waker HD's `cking.sav` and do not handle Captain Toad's `GameData.bin`. The Windows ARM64 results above predate this reference; that build has not been rebuilt on it yet.
+
 ## Next step: stream-out output, a longer playthrough and Android
 
-Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. On Android, add small on-screen touch controls, then check audio, suspend/resume and longer play on the S25 Ultra.
+Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. On Android, adapt the reference's save import and export to Captain Toad's `GameData.bin`, then check audio, suspend/resume and longer play on the S25 Ultra.
 
 The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 

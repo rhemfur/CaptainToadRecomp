@@ -76,8 +76,8 @@ REPLACEMENTS = {
          '    auto df=format_info(uint32_t(d->format.value()),bool(uint32_t(d->format.value())&0x800));\n',
          '    auto sf=format_info(uint32_t(s->format.value()),(s->resFlag&(1u<<2))!=0);  // GX2_RESFLAG_USAGE_DEPTH_BUFFER\n'
          '    auto df=format_info(uint32_t(d->format.value()),(d->resFlag&(1u<<2))!=0);\n'),
-        ('        throw std::runtime_error("Unsupported CPU GX2CopySurface format layout");\n',
-         '        throw std::runtime_error("Unsupported CPU GX2CopySurface format layout: " +\n'
+        ('        exception_report::raise("Unsupported CPU GX2CopySurface format layout");\n',
+         '        exception_report::raise("Unsupported CPU GX2CopySurface format layout: " +\n'
          '            std::to_string(uint32_t(s->format.value())) + " tile " + std::to_string(uint32_t(s->tileMode.value())) + " -> " +\n'
          '            std::to_string(uint32_t(d->format.value())) + " tile " + std::to_string(uint32_t(d->tileMode.value())));\n'),
     ],
@@ -160,6 +160,162 @@ REPLACEMENTS['../CMakeLists.txt'] = [
      'target_compile_options(cemu_latte PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
     ('target_compile_options(shadertest PRIVATE "SHELL:-include ${CEMU_DIR}/cemu_shim.h")\n',
      'target_compile_options(shadertest PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
+]
+# The reference's on-screen controls are drawn smaller and kept in the corners, close together:
+# Captain Toad is a casual game and the picture matters more than reach. Positions count in the
+# screen's short side from a corner (negative: from the right or bottom edge), so wide phones keep
+# each group compact.
+REPLACEMENTS['../android/app/src/main/java/org/wwhdrecomp/wwhd/TouchControls.java'] = [
+    ('''        controls.add(new Control(KIND_STICK, 0, "", 0.14f, 0.70f, 0.13f));
+        controls.add(new Control(KIND_STICK, 1, "", 0.68f, 0.80f, 0.11f));
+        // A B X Y where a Wii U GamePad has them
+        final float ax = 0.86f, ay = 0.60f, d = 0.10f;
+        controls.add(new Control(KIND_FACE, FACE_A, "A", ax + d * 0.75f, ay, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_B, "B", ax, ay + d, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_X, "X", ax, ay - d, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_Y, "Y", ax - d * 0.75f, ay, 0.055f));
+        final float px = 0.14f, py = 0.36f, e = 0.075f;
+        controls.add(new Control(KIND_BUTTON, DPAD_UP, "▲", px, py - e, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_DOWN, "▼", px, py + e, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_LEFT, "◀", px - e * 0.75f, py, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_RIGHT, "▶", px + e * 0.75f, py, 0.04f));
+        controls.add(new Control(KIND_TRIGGER, 0, "ZL", 0.19f, 0.15f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, LEFT_SHOULDER, "L", 0.30f, 0.15f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, RIGHT_SHOULDER, "R", 0.70f, 0.15f, 0.05f));
+        controls.add(new Control(KIND_TRIGGER, 1, "ZR", 0.81f, 0.15f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, BACK, "−", 0.42f, 0.92f, 0.04f));
+        controls.add(new Control(KIND_BUTTON, START, "+", 0.58f, 0.92f, 0.04f));
+''', '''        // CaptainToadRecomp: corners, in short-side units (negative: from the right / bottom edge)
+        controls.add(new Control(KIND_STICK, 0, "", 0.27f, -0.23f, 0.17f));
+        final float ax = -0.17f, ay = -0.25f, d = 0.08f;  // A B X Y as on a Wii U GamePad
+        controls.add(new Control(KIND_FACE, FACE_A, "A", ax + d, ay, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_B, "B", ax, ay + d, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_X, "X", ax, ay - d, 0.055f));
+        controls.add(new Control(KIND_FACE, FACE_Y, "Y", ax - d, ay, 0.055f));
+        final float px = 0.20f, py = -0.53f, e = 0.065f;  // the D-pad above the left stick
+        controls.add(new Control(KIND_BUTTON, DPAD_UP, "▲", px, py - e, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_DOWN, "▼", px, py + e, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_LEFT, "◀", px - e, py, 0.04f));
+        controls.add(new Control(KIND_BUTTON, DPAD_RIGHT, "▶", px + e, py, 0.04f));
+        controls.add(new Control(KIND_TRIGGER, 0, "ZL", 0.20f, 0.07f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, LEFT_SHOULDER, "L", 0.31f, 0.07f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, RIGHT_SHOULDER, "R", -0.31f, 0.07f, 0.05f));
+        controls.add(new Control(KIND_TRIGGER, 1, "ZR", -0.20f, 0.07f, 0.05f));
+        controls.add(new Control(KIND_BUTTON, BACK, "−", -0.31f, 0.18f, 0.04f));
+        controls.add(new Control(KIND_BUTTON, START, "+", -0.20f, 0.18f, 0.04f));
+'''),
+    # Captain Toad's menus and many levels are bright: translucent white controls vanished on its
+    # white title screen. A dark translucent body keeps them visible on light and dark pictures.
+    ('        fill.setColor(on ? 0x90FFFFFF : 0x38FFFFFF);\n',
+     '        fill.setColor(on ? 0x90FFFFFF : 0x60000000);  // CaptainToadRecomp: dark body (reference: 0x38FFFFFF)\n'),
+    ('        text.setColor(0xE0FFFFFF);\n',
+     '        text.setColor(0xE0FFFFFF);\n'
+     '        text.setShadowLayer(c.r * 0.08f, 0, 0, 0xC0000000);  // CaptainToadRecomp: readable on white\n'),
+    # The camera follows a finger dragged anywhere outside the controls ("moving the map"): its speed
+    # becomes the right stick, so the view turns with the finger and stops when it stops. The touch
+    # still reaches the game as before (GamePad picture, view button). The top left corner (view and
+    # show/hide buttons) does not drag. Only while the controls are shown.
+    ('    private int lastButtons = -1;\n',
+     '    private int lastButtons = -1;\n'
+     '    // CaptainToadRecomp: camera drag (the finger on no control) as the right stick\n'
+     '    private static final float DRAG_FULL = 0.9f;  // short sides per second for a full stick\n'
+     '    private int dragId = -1;\n'
+     '    private float dragX, dragY, camX, camY;\n'
+     '    private long dragT;\n'
+     '    private final Runnable dragRest = () -> { camX = 0; camY = 0; update(); };\n'
+     '    private boolean dragZone(float x, float y) {\n'
+     '        final float s = Math.min(getWidth(), getHeight());\n'
+     '        return !(x < s * 0.25f && y < s * 0.30f);\n'
+     '    }\n'
+     '    private void dragStart(int id, float x, float y, long t) {\n'
+     '        if (dragId >= 0 || !active() || !dragZone(x, y)) return;\n'
+     '        dragId = id; dragX = x; dragY = y; dragT = t;\n'
+     '    }\n'
+     '    private void dragMove(float x, float y, long t) {\n'
+     '        final float s = Math.min(getWidth(), getHeight());\n'
+     '        final long dt = Math.max(1, t - dragT);\n'
+     '        final float full = s * DRAG_FULL / 1000f;  // pixels per millisecond for a full stick\n'
+     '        final float tx = Math.max(-1f, Math.min(1f, (x - dragX) / dt / full));\n'
+     '        final float ty = Math.max(-1f, Math.min(1f, (y - dragY) / dt / full));\n'
+     '        camX = camX * 0.4f + tx * 0.6f; camY = camY * 0.4f + ty * 0.6f;\n'
+     '        dragX = x; dragY = y; dragT = t;\n'
+     '        removeCallbacks(dragRest);\n'
+     '        postDelayed(dragRest, 80);  // the finger rests: the camera stops\n'
+     '    }\n'
+     '    private void dragEnd() { dragId = -1; removeCallbacks(dragRest); camX = 0; camY = 0; }\n'),
+    ('                if (c == null && action == MotionEvent.ACTION_DOWN) {\n',
+     '                if (c == null && action == MotionEvent.ACTION_DOWN && active()) {\n'
+     '                    // CaptainToadRecomp: keep the gesture, pass the touch on and drag the camera with it\n'
+     '                    forward(event, index, action);\n'
+     '                    dragStart(id, x, y, event.getEventTime());\n'
+     '                } else if (c == null && action == MotionEvent.ACTION_DOWN) {\n'),
+    ('                } else if (c == null) {\n                    forward(event, index, action);\n',
+     '                } else if (c == null) {\n                    forward(event, index, action);\n'
+     '                    dragStart(id, x, y, event.getEventTime());\n'),
+    ('                    if (c == null) forward(event, i, MotionEvent.ACTION_MOVE);\n',
+     '                    if (c == null) {\n'
+     '                        forward(event, i, MotionEvent.ACTION_MOVE);\n'
+     '                        if (id == dragId) dragMove(event.getX(i), event.getY(i), event.getEventTime());\n'
+     '                    }\n'),
+    ('                    if (c == null) { forward(event, i, all ? MotionEvent.ACTION_CANCEL : action); continue; }\n',
+     '                    if (c == null) {\n'
+     '                        forward(event, i, all ? MotionEvent.ACTION_CANCEL : action);\n'
+     '                        if (id == dragId) dragEnd();\n'
+     '                        continue;\n'
+     '                    }\n'),
+    ('        buttons |= face << 16;  // (only for the change check below)\n',
+     '        if (dragId >= 0 || camX != 0 || camY != 0) { rx = camX; ry = camY; }  // CaptainToadRecomp: camera drag\n'
+     '        buttons |= face << 16;  // (only for the change check below)\n'),
+    ('    private static void place(Control c, int w, int h, float s) {\n        c.cx = c.fx * w; c.cy = c.fy * h; c.r = c.fr * s;\n',
+     '    private static final float SIZE = 0.7f;  // CaptainToadRecomp: smaller controls\n\n'
+     '    private static void place(Control c, int w, int h, float s) {\n'
+     '        c.cx = c.fx >= 0 ? c.fx * s : w + c.fx * s; c.cy = c.fy >= 0 ? c.fy * s : h + c.fy * s; c.r = c.fr * s * SIZE;\n'),
+]
+# Settings menu: Captain Toad's build hides what only works with Wind Waker HD. The Saves tab (save
+# states and crash recovery restore Wind Waker HD memory), the Mods tab (its mods, catalogue and Cemu
+# packs), the frame-rate choice (interpolation from Wind Waker HD's 30 logic steps; Captain Toad
+# draws 60 itself) and the bloom and ambient-occlusion fixes made for Wind Waker HD's shaders.
+REPLACEMENTS['src/overlay/overlay.cpp'] = [
+    ('    if (ImGui::Begin("Wind Waker HD  -  Settings", &open, fl)) {\n',
+     '#ifdef CT_FOREIGN_GUEST\n'
+     '    if (ImGui::Begin("Captain Toad  -  Settings", &open, fl)) {\n'
+     '#else\n'
+     '    if (ImGui::Begin("Wind Waker HD  -  Settings", &open, fl)) {\n'
+     '#endif\n'),
+    ('            if (navigation_pressed(input_map::kPadLB)) U.select_tab = (U.tab + kTabs - 1) % kTabs;\n'
+     '            if (navigation_pressed(input_map::kPadRB)) U.select_tab = (U.tab + 1) % kTabs;\n',
+     '            if (navigation_pressed(input_map::kPadLB)) U.select_tab = (U.tab + kTabs - 1) % kTabs;\n'
+     '            if (navigation_pressed(input_map::kPadRB)) U.select_tab = (U.tab + 1) % kTabs;\n'
+     '#ifdef CT_FOREIGN_GUEST\n'
+     '            // L / R step over the hidden tabs in the direction pressed\n'
+     '            while (U.select_tab == kSaves || U.select_tab == kMods)\n'
+     '                U.select_tab = (U.select_tab + (navigation_pressed(input_map::kPadLB) ? kTabs - 1 : 1)) % kTabs;\n'
+     '#endif\n'),
+    ('                ImGuiTabItemFlags f = U.select_tab == i ? ImGuiTabItemFlags_SetSelected : 0;\n',
+     '#ifdef CT_FOREIGN_GUEST\n'
+     '                if (i == kSaves || i == kMods) continue;\n'
+     '#endif\n'
+     '                ImGuiTabItemFlags f = U.select_tab == i ? ImGuiTabItemFlags_SetSelected : 0;\n'),
+    ('    heading("Frame rate");\n', '#ifndef CT_FOREIGN_GUEST\n    heading("Frame rate");\n'),
+    ('    heading("Internal resolution");\n', '#endif\n    heading("Internal resolution");\n'),
+    ('    float bloom = render::bloom_strength() * 100.0f;\n',
+     '#ifndef CT_FOREIGN_GUEST\n    float bloom = render::bloom_strength() * 100.0f;\n'),
+    ('        post_changed([v] { render::set_ao_hires(v); });\n    ImGui::SameLine(0, 30);\n',
+     '        post_changed([v] { render::set_ao_hires(v); });\n    ImGui::SameLine(0, 30);\n#endif\n'),
+]
+# Gyro: the reference's 0.5 suits Wind Waker HD's first-person aiming; held at arm's length, a phone
+# turned too far for a little camera movement in Captain Toad. Saved settings keep their own value.
+REPLACEMENTS['src/motion/fusion.h'] = [
+    ('    static constexpr float kDefaultSensitivity = 0.5f,',
+     '    static constexpr float kDefaultSensitivity = 1.5f,  // CaptainToadRecomp (reference: 0.5)\n                           '),
+]
+# The PC route (this APK: the game copied over USB) is ready to play when the game folder has
+# Captain Toad's executable; the app icon then starts the game instead of the setup screen.
+REPLACEMENTS['../android/app/src/main/java/org/wwhdrecomp/wwhd/SetupActivity.java'] = [
+    ('                return external != null && new File(external, "game/code/cking.rpx").isFile();\n',
+     '                return external != null && new File(external, "game/code/Kinopio.rpx").isFile();\n'),
+    ('                    (external != null && new File(external, "game/code/cking.rpx").isFile()));\n',
+     '                    (external != null && new File(external, "game/code/Kinopio.rpx").isFile()));\n'),
 ]
 # Exports that read state private to a reference source file are appended to that file.
 APPENDS = {
