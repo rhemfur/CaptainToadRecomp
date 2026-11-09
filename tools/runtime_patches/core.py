@@ -84,7 +84,7 @@ REPLACEMENTS['src/aspect.cpp'] = [
      '#if defined(CT_FOREIGN_GUEST) && defined(__ANDROID__)\n    if (!e || !*e) return kWindow;\n#else\n'
      '    if (!e || !*e) return kOriginal;\n#endif  // Captain Toad Android aspect\n'),
     ('void set_fov_scale(float scale) {\n', 'void set_fov_scale(float scale) {\n' + _ct_keep.format('scale = 1.0f;  // Wind Waker HD only')),
-    # Without the camera hook (runtime/ct_frame.cpp; EUR v16 so far) a wider shape would stretch the
+    # Without the camera hook (runtime/ct_frame.cpp; another region or version) a wider shape would stretch the
     # game's 16:9 camera: the picture keeps 16:9 whatever the setting.
     ('    float a = requested();\n    bool changed = !same(a, g_game);\n',
      '    float a = requested();\n'

@@ -1,5 +1,6 @@
 // Captain Toad's frame start. The profile's hook list (profiles/*.json "hooks", tools/recompile.py)
-// routes the game's per-frame function through hook_<address>: USA v16 0x02420F10, which runs the game
+// routes the game's per-frame function through hook_<address>: v16 0x02420F10 (USA and EUR share this
+// code's layout; Cemu's KinopioAspectUWv16 patch uses one set of addresses for every v16 region), which runs the game
 // logic, draws and swaps the TV/GamePad buffers, and which the main loop calls once a frame. Its entry
 // is the point where save states are made and loaded (savestate.cpp ss::ct_service): the main thread
 // is there on every frame with the same call chain, and the other game threads can be parked.
@@ -35,8 +36,8 @@ static void ct_aspect_constants() {
     written = want;
 }
 
-// Save states need the frame hook: only a build whose profile hooks 0x02420F10 (USA v16) has the
-// original function. Another region's build (EUR v16 has no hooks yet) never reaches ct_service, so
+// Save states need the frame hook: only a build whose profile hooks 0x02420F10 (USA and EUR v16) has the
+// original function. A build without it never reaches ct_service, so
 // a save request would wait for ever: the Saves tab says so instead (tools/runtime_patches/ui.py).
 extern "C" bool ct_save_states_available() { return f_02420F10_orig != nullptr; }
 
@@ -46,12 +47,12 @@ extern "C" void hook_02420F10(Cpu* c) {
     f_02420F10_orig(c);
 }
 
-// USA v16 0x023734F8 (r3 renderer, r4 viewport {left, top, right, bottom}, r5 layer: 0 TV, 1 GamePad)
+// v16 0x023734F8 (r3 renderer, r4 viewport {left, top, right, bottom}, r5 layer: 0 TV, 1 GamePad)
 // stores the viewport's width / height as the layer camera's projection aspect (+0x130). For the TV's
 // 1280x720 and the GamePad's 854x480 the picture shape replaces it: the runtime widens both screens'
 // buffers (tools/patch_runtime.py, screen_shaped).
 extern "C" __attribute__((weak)) void f_023734F8_orig(Cpu* c);
-// A wider picture needs the camera hook too: without it (EUR v16 so far) the game keeps a 16:9
+// A wider picture needs the camera hook too: without it the game keeps a 16:9
 // projection and widened screens would stretch it, so the picture shape stays 16:9 (aspect.cpp).
 extern "C" bool ct_camera_hook_available() { return f_023734F8_orig != nullptr; }
 
@@ -68,11 +69,11 @@ extern "C" void hook_023734F8(Cpu* c) {
 }
 
 // Return addresses that continue the same way, for the save-state check that a parked thread is where
-// the state saved it (threads.cpp same_chain). sead::Thread::run (USA v16 0x022DA820) waits on its
+// the state saved it (threads.cpp same_chain). sead::Thread::run (v16 0x022DA820) waits on its
 // message queue first before its loop (returning to 0x022DA840) and then in the loop (0x022DA870); both
 // test the message for quit, call calc and wait again. A thread that has not yet had a message, as in a
 // game started afresh, can so load a state saved after it had one (sead::MicConnectThread).
-// The polling loop at USA v16 0x0241EBC4 has four branches that end in OSSleepTicks (returning to
+// The polling loop at v16 0x0241EBC4 has four branches that end in OSSleepTicks (returning to
 // 0x0241EC68, 0x0241ECB4, 0x0241ED18 and 0x0241ED74); each reloads the same registers and then tests r11
 // to loop or leave. Every pair was checked in the generated code to reload the same register set.
 extern "C" uint32_t ct_equivalent_return(uint32_t lr) {

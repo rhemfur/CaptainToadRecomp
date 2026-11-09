@@ -10,7 +10,7 @@ Updated October 11, 2026.
 - Extracted the EUR base game and v16 update separately, preserving the original packages.
 - Prepared an effective game tree with 1,572 files, replacing 124 base paths with update files. Every copied file was hash-checked against its extracted source.
 - Identified `Kinopio.rpx`, SHA-256 `3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464`.
-- Created profile `CT-EUR-v16` with an identity address map and no Zelda hooks.
+- Created profile `CT-EUR-v16` with an identity address map and no Zelda hooks; it later gained Captain Toad's own frame and camera hooks, at the same addresses as USA v16.
 - Generated 45,773 functions in 48 C translation units and compiled them for Android ARM64.
 - Built and ran a headless diagnostic using generic memory, loader and thread components.
 - Added debugger/clock queries, fast mutex, filesystem and MCP/UC startup services.
@@ -89,4 +89,8 @@ On October 11, 2026, on the S25 Ultra (Android 16, Adreno 830, Vulkan 1.3.284) t
 
 ## Merged macOS, USA and Android work
 
-On November 9, 2026, the macOS, USA v16 and Android work (pull request #1) was merged: the reference moved to ZeldaWWHDRecomp `59aa6dd`, the runtime patches are split by area (`tools/runtime_patches`), and USA v16 gained save states, a wider picture and cheats through its profile's hooks. On top of it, Captain Toad's Android app keeps its on-screen controls in the corners with a dark body, turns the camera with a finger dragged outside them (taps still touch the GamePad), defaults the phone's gyro to sensitivity 1.5, and, in a build without the frame and camera hooks (EUR v16 so far), says save states are unavailable and keeps the picture 16:9. The EUR v16 APK was played on the Galaxy S25 Ultra with no missing import; the corner layout, camera drag, taps, gyro, Saves notice and 16:9 picture were checked there. EUR save states and a wider EUR picture need its own frame and camera hooks.
+On November 9, 2026, the macOS, USA v16 and Android work (pull request #1) was merged: the reference moved to ZeldaWWHDRecomp `59aa6dd`, the runtime patches are split by area (`tools/runtime_patches`), and USA v16 gained save states, a wider picture and cheats through its profile's hooks. On top of it, Captain Toad's Android app keeps its on-screen controls in the corners with a dark body, turns the camera with a finger dragged outside them (taps still touch the GamePad), defaults the phone's gyro to sensitivity 1.5, and, in a build without the frame and camera hooks (EUR v16 at that point), says save states are unavailable and keeps the picture 16:9. The EUR v16 APK was played on the Galaxy S25 Ultra with no missing import; the corner layout, camera drag, taps, gyro, Saves notice and 16:9 picture were checked there. EUR's own hooks followed (next section).
+
+## EUR save states and wide picture
+
+EUR v16 hooks the same per-frame and camera functions as USA v16 (`02420F10`, `023734F8`): its code has the same layout there. The three 16:9 constants and the camera function's instructions are at the same addresses, Cemu's `KinopioAspectUWv16` patch names one set of addresses for every v16 region, the save states' return addresses follow the same calls, and the per-frame function's call tree reaches `GX2SwapScanBuffers`. On the Galaxy S25 Ultra a full save state (320 MB) was written in 0.48 s and loaded back in 0.64 s with play continuing, and *Match screen* filled the 2340x1080 screen on the title screen and the fountain hub with nothing stretched.

@@ -350,7 +350,7 @@ REPLACEMENTS['src/overlay/gyro_popup.h'] = [
      '#endif\n'),
 ]
 
-# Save states run from the frame hook (runtime/ct_frame.cpp), which only USA v16's profile has so far:
+# Save states run from the frame hook (runtime/ct_frame.cpp), which the USA and EUR v16 profiles have:
 # in a build without it the Saves tab says so instead of offering slots that never save.
 REPLACEMENTS['src/overlay/overlay.cpp'] += [
     ('void tab_saves() {\n    refresh_slots(false);\n',
@@ -360,7 +360,7 @@ REPLACEMENTS['src/overlay/overlay.cpp'] += [
      '    if (!ct_save_states_available()) {\n'
      '        heading("Save states");\n'
      '        note("Save states are not available for this version of the game yet (they need its frame hook; "\n'
-     '             "USA v16 has one). Your progress is saved by the game itself.");\n'
+     '             "USA and EUR v16 have one). Your progress is saved by the game itself.");\n'
      '        if (ext::features().screenshots) tab_saves_screenshots();\n'
      '        return;\n'
      '    }\n'

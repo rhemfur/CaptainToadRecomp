@@ -5,6 +5,13 @@
   "update_version": 16,
   "rpx": "Kinopio.rpx",
   "rpx_sha256": "3e867817ff4cfbefcd1f3323fe1e97919852cd86aee3738bd8d44e6e460a0464",
-  "hooks": [],
-  "status": "gx2-resource-bootstrap-hiz-query-pending-not-playable"
+  "hooks": [
+    "02420F10",
+    "023734F8"
+  ],
+  "status": "playable-android",
+  "hook_notes": {
+    "02420F10": "per-frame function, at the same address as USA v16 (its call tree reaches GX2SwapScanBuffers): save states (runtime/ct_frame.cpp)",
+    "023734F8": "stores a layer camera's viewport width / height as its projection aspect (+0x130): the same code as USA v16, at the address Cemu's KinopioAspectUWv16 patch uses for every v16 region: the TV aspect setting (runtime/ct_frame.cpp)"
+  }
 }
