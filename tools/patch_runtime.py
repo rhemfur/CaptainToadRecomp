@@ -8,6 +8,8 @@ runs stops through ppc_unimplemented instead of executing unrelated Captain Toad
 from pathlib import Path
 import argparse
 import re
+import subprocess
+import sys
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('upstream', type=Path)
@@ -15,308 +17,22 @@ parser.add_argument('--gen', type=Path, default=Path('build/gen'), help='generat
 args = parser.parse_args()
 runtime = args.upstream / 'runtime'
 
-REPLACEMENTS = {
-    'src/main.cpp': [
-        ('std::string rpx = config::game_dir + "/code/cking.rpx";',
-         'std::string rpx = config::game_dir + "/code/Kinopio.rpx";'),
-        ('mem::write_cstr(arg0, "cking.rpx", 16);', 'mem::write_cstr(arg0, "Kinopio.rpx", 16);'),
-        # Windows crash reports also name the guest arguments and walk the guest stack back chain.
-        ('    if(Cpu* c=threads::current()){n=snprintf(buf,sizeof buf,"guest lr=%08X ctr=%08X\\n",c->lr,c->ctr); win_crash_out(fd,buf,n);}\n',
-         '    if(Cpu* c=threads::current()){n=snprintf(buf,sizeof buf,"guest lr=%08X ctr=%08X\\n",c->lr,c->ctr); win_crash_out(fd,buf,n);}\n'
-         '    if(Cpu* c=threads::current()){\n'
-         '        n=snprintf(buf,sizeof buf,"guest r1=%08X r3=%08X r4=%08X r5=%08X r31=%08X\\n",c->r[1],c->r[3],c->r[4],c->r[5],c->r[31]); win_crash_out(fd,buf,n);\n'
-         '        uint32_t sp=c->r[1];\n'
-         '        for(int i=0;i<24&&sp>=0x10000&&sp<0xF0000000u;i++){uint32_t next=ld32(sp);if(next<0x10000||next>=0xF0000000u)break;\n'
-         '            n=snprintf(buf,sizeof buf,"  guest frame %08X lr %08X\\n",next,ld32(next+4)); win_crash_out(fd,buf,n); sp=next;}\n'
-         '    }\n'),
-    ],
-    # Canonical addresses name Wind Waker HD code and data. With CT_FOREIGN_GUEST none of them is
-    # valid, even when it falls inside Captain Toad's ranges: features that check validity switch
-    # themselves off, and direct uses resolve into the protected guest null page and fault.
-    'include/guest_addr.h': [
-        ('static inline int guest_code_valid(uint32_t a) {\n',
-         'static inline int guest_code_valid(uint32_t a) {\n#ifdef CT_FOREIGN_GUEST\n    (void)a;\n    return 0;\n#endif\n'),
-        ('static inline int guest_data_valid(uint32_t a) {\n',
-         'static inline int guest_data_valid(uint32_t a) {\n#ifdef CT_FOREIGN_GUEST\n    (void)a;\n    return 0;\n#endif\n'),
-        ('static inline uint32_t guest_code(uint32_t canon) {\n',
-         'static inline uint32_t guest_code(uint32_t canon) {\n#ifdef CT_FOREIGN_GUEST\n    (void)canon;\n    return 0x00001000u;\n#endif\n'),
-        ('static inline uint32_t guest_data(uint32_t canon) {\n',
-         'static inline uint32_t guest_data(uint32_t canon) {\n#ifdef CT_FOREIGN_GUEST\n    (void)canon;\n    return 0x00001000u;\n#endif\n'),
-    ],
-    # Wind Waker HD's sound manager supplies the TV/GamePad faders; other titles keep the TV default.
-    'src/hle/ax.cpp': [
-        ('    uint32_t mgr = ld32(GD(0x1018EC64));\n',
-         '    if (!guest_data_valid(0x1018EC64)) return false;\n    uint32_t mgr = ld32(GD(0x1018EC64));\n'),
-    ],
-    # OSWaitRendezvous waits for the cores in its mask, as Cemu coreinit_Synchronization.cpp does.
-    # Counting arrivals let Captain Toad's main thread (core 1, mask 1) pass before its audio launch
-    # thread (core 0) had initialized the sound system. `arrived` now holds the arrived-core bits.
-    'src/threads.cpp': [
-        ('    uint32_t arrived = 0;\n', '    uint32_t arrived = 0;  // bit per core that has arrived\n'),
-        ('''    // arg1 is a core mask; we treat each set bit as one participant
-    HRendezvous* r = g_rdv.get(arg(c, 0));
-    uint32_t need = __builtin_popcount(arg(c, 1) & 7);
-    std::unique_lock<std::mutex> lk(r->m);
-    r->arrived++;
-    r->cv.notify_all();
-    park_wait(lk, r->cv, [&] { return r->arrived >= need; }, W_RDV, arg(c, 0));''',
-         '''    // arg1 is a core mask: mark this core, then wait until every core in the mask has arrived
-    HRendezvous* r = g_rdv.get(arg(c, 0));
-    uint32_t need = arg(c, 1) & 7;
-    std::unique_lock<std::mutex> lk(r->m);
-    r->arrived |= 1u << (c->core & 3);
-    r->cv.notify_all();
-    park_wait(lk, r->cv, [&] { return (r->arrived & need) == need; }, W_RDV, arg(c, 0));'''),
-    ],
-    # GX2's 0x800 format bit marks float formats (R16_FLOAT 0x806, R16G16_FLOAT 0x810), not depth.
-    # A depth surface is one created for depth-buffer use, as Cemu's GX2CalculateSurfaceInfo decides.
-    # Name the formats, so an unsupported copy identifies itself.
-    'src/gfx/vulkan/surfaces.cpp': [
-        ('    auto sf=format_info(uint32_t(s->format.value()),bool(uint32_t(s->format.value())&0x800));\n'
-         '    auto df=format_info(uint32_t(d->format.value()),bool(uint32_t(d->format.value())&0x800));\n',
-         '    auto sf=format_info(uint32_t(s->format.value()),(s->resFlag&(1u<<2))!=0);  // GX2_RESFLAG_USAGE_DEPTH_BUFFER\n'
-         '    auto df=format_info(uint32_t(d->format.value()),(d->resFlag&(1u<<2))!=0);\n'),
-        ('        exception_report::raise("Unsupported CPU GX2CopySurface format layout");\n',
-         '        exception_report::raise("Unsupported CPU GX2CopySurface format layout: " +\n'
-         '            std::to_string(uint32_t(s->format.value())) + " tile " + std::to_string(uint32_t(s->tileMode.value())) + " -> " +\n'
-         '            std::to_string(uint32_t(d->format.value())) + " tile " + std::to_string(uint32_t(d->tileMode.value())));\n'),
-    ],
-    # Stream out (Cemu GX2_Streamout.cpp, LatteCommandProcessor.cpp, LatteStreamoutGPU.cpp): context
-    # updates run on the render thread in command order; draws advance each buffer's write offset.
-    'src/gx2/gx2_cmd.h': [
-        ('    OP_LAYOUT_CONTENT,  // DrawSelf scope: clip TV menu content to the native layout region\n    OP_COUNT\n',
-         '    OP_LAYOUT_CONTENT,  // DrawSelf scope: clip TV menu content to the native layout region\n'
-         '    OP_STREAMOUT_UPDATE,  // buffer index, mode (0 reset, 2 load from context, 3 save to context), context\n'
-         '    OP_COUNT\n'),
-    ],
-    'src/gx2/gx2_core.cpp': [
-        ('static void execute_op(Op op, const uint32* p, uint32 n) {\n',
-         '''// Stream-out draws advance each buffer's write offset by the bytes their vertices emit, bounded by
-// the buffer (Cemu LatteStreamoutGPU.cpp). The renderer does not produce that output yet: the buffers
-// keep their previous contents.
-static void streamout_advance(uint32 count, uint32 instances) {
-    if (!g_regs[mmVGT_STRMOUT_EN]) return;
-    static bool logged = false;
-    if (!logged) { logged = true; LOG("[gx2] stream-out draws advance their buffer offsets; their vertex output is not produced yet"); }
-    for (uint32 i = 0; i < 4; i++) {
-        const uint32 stride = g_regs[mmVGT_STRMOUT_VTX_STRIDE_0 + i * 4] << 2, size = g_regs[mmVGT_STRMOUT_BUFFER_SIZE_0 + i * 4] << 2;
-        uint32& offset = g_regs[mmVGT_STRMOUT_BUFFER_OFFSET_0 + i * 4];
-        if (!stride || !size) continue;
-        offset += (uint32)std::min<uint64>(uint64(count) * instances * stride, offset < size ? size - offset : 0);
-    }
-}
-static void execute_op(Op op, const uint32* p, uint32 n) {
-'''),
-        ('    case OP_DRAW: render::draw(g_regs, p[0], p[1], 0, 0, p[2], p[3]); break;\n'
-         '    case OP_DRAW_INDEXED: render::draw(g_regs, p[0], p[1], p[2], p[3], p[4], p[5]); break;\n',
-         '    case OP_DRAW: render::draw(g_regs, p[0], p[1], 0, 0, p[2], p[3]); streamout_advance(p[1], p[3]); break;\n'
-         '    case OP_DRAW_INDEXED: render::draw(g_regs, p[0], p[1], p[2], p[3], p[4], p[5]); streamout_advance(p[1], p[5]); break;\n'
-         '    case OP_STREAMOUT_UPDATE: {  // IT_STRMOUT_BUFFER_UPDATE\n'
-         '        uint32& offset = g_regs[mmVGT_STRMOUT_BUFFER_OFFSET_0 + 4 * (p[0] & 3)];\n'
-         '        if (p[1] == 0) offset = 0;\n'
-         '        else if (p[1] == 2) offset = p[2] ? ld32(p[2]) : 0;\n'
-         '        else if (p[1] == 3 && p[2]) st32(p[2], offset);\n'
-         '        break;\n'
-         '    }\n'),
-    ],
-    'src/gx2/gx2_resources.cpp': [
-        ('        set_regs(mmSQ_VTX_SEMANTIC_0, &tmp[mmSQ_VTX_SEMANTIC_0], nsem);\n    }\n}\n',
-         '        set_regs(mmSQ_VTX_SEMANTIC_0, &tmp[mmSQ_VTX_SEMANTIC_0], nsem);\n    }\n'
-         '    if (ld32(vs + 0x110))  // usesStreamOut: per-buffer vertex strides in dwords (Cemu GX2_Shader.cpp)\n'
-         '        for (uint32 i = 0; i < 4; i++) set_reg(mmVGT_STRMOUT_VTX_STRIDE_0 + i * 4, ld32(vs + 0x114 + 4 * i) >> 2);\n'
-         '}\n'),
-    ],
-    'src/savestate.cpp': [
-        ('fopen((config::game_dir + "/code/cking.rpx").c_str(), "rb")',
-         'fopen((config::game_dir + "/code/Kinopio.rpx").c_str(), "rb")'),
-    ],
-    # A dynamic export without HLE returned 0 when called, as Cemu's unsupported-import stub does.
-    # The strict build stops there instead, like a missing static import.
-    'src/hle/coreinit_misc.cpp': [
-        ('            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[dynload] call to unimplemented dynamic export (lr=%08X)", c->lr); c->r[3] = 0; };\n',
-         '#ifdef CT_DIAGNOSTIC_STRICT_HLE\n'
-         '            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[ct-stop] missing HLE dynamic export (lr=%08X; see FindExport above)", c->lr); std::_Exit(78); };\n'
-         '#else\n'
-         '            static void (*stub)(Cpu*) = [](Cpu* c) { log_msg("[dynload] call to unimplemented dynamic export (lr=%08X)", c->lr); c->r[3] = 0; };\n'
-         '#endif\n'),
-    ],
-}
-# The Android app gets its own package and name, so installing it never replaces a Wind Waker HD
-# install. The Java namespace stays; only the installed identity changes.
-REPLACEMENTS['../android/app/build.gradle'] = [
-    ('        applicationId "org.wwhdrecomp.wwhd"\n', '        applicationId "org.ctrecomp.captaintoad"\n'),
-]
-REPLACEMENTS['../android/app/src/main/res/values/strings.xml'] = [
-    ('    <string name="app_name">Wind Waker HD</string>\n', '    <string name="app_name">Captain Toad</string>\n'),
-]
-REPLACEMENTS['../CMakeLists.txt'] = [
-    ('target_include_directories(wwhd PRIVATE runtime/include runtime/src runtime/src/gx2)\n',
-     'target_include_directories(wwhd PRIVATE runtime/include runtime/src runtime/src/gx2)\n'
-     '# Captain Toad runtime services the reference runtime lacks (CaptainToadRecomp tools/patch_runtime.py)\n'
-     'set(CT_EXTRA_SOURCES "" CACHE STRING "Captain Toad runtime sources added to the game executable")\n'
-     'target_sources(wwhd PRIVATE ${CT_EXTRA_SOURCES})\n'),
-    # SHELL: splits on spaces, so a checkout path with a space broke the forced include.
-    ('target_compile_options(cemu_latte PRIVATE "SHELL:-include ${CEMU_DIR}/cemu_shim.h")\n',
-     'target_compile_options(cemu_latte PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
-    ('target_compile_options(shadertest PRIVATE "SHELL:-include ${CEMU_DIR}/cemu_shim.h")\n',
-     'target_compile_options(shadertest PRIVATE "SHELL:-include \\"${CEMU_DIR}/cemu_shim.h\\"")\n'),
-]
-# The reference's on-screen controls are drawn smaller and kept in the corners, close together:
-# Captain Toad is a casual game and the picture matters more than reach. Positions count in the
-# screen's short side from a corner (negative: from the right or bottom edge), so wide phones keep
-# each group compact.
-REPLACEMENTS['../android/app/src/main/java/org/wwhdrecomp/wwhd/TouchControls.java'] = [
-    ('''        controls.add(new Control(KIND_STICK, 0, "", 0.14f, 0.70f, 0.13f));
-        controls.add(new Control(KIND_STICK, 1, "", 0.68f, 0.80f, 0.11f));
-        // A B X Y where a Wii U GamePad has them
-        final float ax = 0.86f, ay = 0.60f, d = 0.10f;
-        controls.add(new Control(KIND_FACE, FACE_A, "A", ax + d * 0.75f, ay, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_B, "B", ax, ay + d, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_X, "X", ax, ay - d, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_Y, "Y", ax - d * 0.75f, ay, 0.055f));
-        final float px = 0.14f, py = 0.36f, e = 0.075f;
-        controls.add(new Control(KIND_BUTTON, DPAD_UP, "▲", px, py - e, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_DOWN, "▼", px, py + e, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_LEFT, "◀", px - e * 0.75f, py, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_RIGHT, "▶", px + e * 0.75f, py, 0.04f));
-        controls.add(new Control(KIND_TRIGGER, 0, "ZL", 0.19f, 0.15f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, LEFT_SHOULDER, "L", 0.30f, 0.15f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, RIGHT_SHOULDER, "R", 0.70f, 0.15f, 0.05f));
-        controls.add(new Control(KIND_TRIGGER, 1, "ZR", 0.81f, 0.15f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, BACK, "−", 0.42f, 0.92f, 0.04f));
-        controls.add(new Control(KIND_BUTTON, START, "+", 0.58f, 0.92f, 0.04f));
-''', '''        // CaptainToadRecomp: corners, in short-side units (negative: from the right / bottom edge)
-        controls.add(new Control(KIND_STICK, 0, "", 0.27f, -0.23f, 0.17f));
-        final float ax = -0.17f, ay = -0.25f, d = 0.08f;  // A B X Y as on a Wii U GamePad
-        controls.add(new Control(KIND_FACE, FACE_A, "A", ax + d, ay, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_B, "B", ax, ay + d, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_X, "X", ax, ay - d, 0.055f));
-        controls.add(new Control(KIND_FACE, FACE_Y, "Y", ax - d, ay, 0.055f));
-        final float px = 0.20f, py = -0.53f, e = 0.065f;  // the D-pad above the left stick
-        controls.add(new Control(KIND_BUTTON, DPAD_UP, "▲", px, py - e, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_DOWN, "▼", px, py + e, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_LEFT, "◀", px - e, py, 0.04f));
-        controls.add(new Control(KIND_BUTTON, DPAD_RIGHT, "▶", px + e, py, 0.04f));
-        controls.add(new Control(KIND_TRIGGER, 0, "ZL", 0.20f, 0.07f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, LEFT_SHOULDER, "L", 0.31f, 0.07f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, RIGHT_SHOULDER, "R", -0.31f, 0.07f, 0.05f));
-        controls.add(new Control(KIND_TRIGGER, 1, "ZR", -0.20f, 0.07f, 0.05f));
-        controls.add(new Control(KIND_BUTTON, BACK, "−", -0.31f, 0.18f, 0.04f));
-        controls.add(new Control(KIND_BUTTON, START, "+", -0.20f, 0.18f, 0.04f));
-'''),
-    # Captain Toad's menus and many levels are bright: translucent white controls vanished on its
-    # white title screen. A dark translucent body keeps them visible on light and dark pictures.
-    ('        fill.setColor(on ? 0x90FFFFFF : 0x38FFFFFF);\n',
-     '        fill.setColor(on ? 0x90FFFFFF : 0x60000000);  // CaptainToadRecomp: dark body (reference: 0x38FFFFFF)\n'),
-    ('        text.setColor(0xE0FFFFFF);\n',
-     '        text.setColor(0xE0FFFFFF);\n'
-     '        text.setShadowLayer(c.r * 0.08f, 0, 0, 0xC0000000);  // CaptainToadRecomp: readable on white\n'),
-    # The camera follows a finger dragged anywhere outside the controls ("moving the map"): its speed
-    # becomes the right stick, so the view turns with the finger and stops when it stops. The touch
-    # still reaches the game as before (GamePad picture, view button). The top left corner (view and
-    # show/hide buttons) does not drag. Only while the controls are shown.
-    ('    private int lastButtons = -1;\n',
-     '    private int lastButtons = -1;\n'
-     '    // CaptainToadRecomp: camera drag (the finger on no control) as the right stick\n'
-     '    private static final float DRAG_FULL = 0.9f;  // short sides per second for a full stick\n'
-     '    private int dragId = -1;\n'
-     '    private float dragX, dragY, camX, camY;\n'
-     '    private long dragT;\n'
-     '    private final Runnable dragRest = () -> { camX = 0; camY = 0; update(); };\n'
-     '    private boolean dragZone(float x, float y) {\n'
-     '        final float s = Math.min(getWidth(), getHeight());\n'
-     '        return !(x < s * 0.25f && y < s * 0.30f);\n'
-     '    }\n'
-     '    private void dragStart(int id, float x, float y, long t) {\n'
-     '        if (dragId >= 0 || !active() || !dragZone(x, y)) return;\n'
-     '        dragId = id; dragX = x; dragY = y; dragT = t;\n'
-     '    }\n'
-     '    private void dragMove(float x, float y, long t) {\n'
-     '        final float s = Math.min(getWidth(), getHeight());\n'
-     '        final long dt = Math.max(1, t - dragT);\n'
-     '        final float full = s * DRAG_FULL / 1000f;  // pixels per millisecond for a full stick\n'
-     '        final float tx = Math.max(-1f, Math.min(1f, (x - dragX) / dt / full));\n'
-     '        final float ty = Math.max(-1f, Math.min(1f, (y - dragY) / dt / full));\n'
-     '        camX = camX * 0.4f + tx * 0.6f; camY = camY * 0.4f + ty * 0.6f;\n'
-     '        dragX = x; dragY = y; dragT = t;\n'
-     '        removeCallbacks(dragRest);\n'
-     '        postDelayed(dragRest, 80);  // the finger rests: the camera stops\n'
-     '    }\n'
-     '    private void dragEnd() { dragId = -1; removeCallbacks(dragRest); camX = 0; camY = 0; }\n'),
-    ('                if (c == null && action == MotionEvent.ACTION_DOWN) {\n',
-     '                if (c == null && action == MotionEvent.ACTION_DOWN && active()) {\n'
-     '                    // CaptainToadRecomp: keep the gesture, pass the touch on and drag the camera with it\n'
-     '                    forward(event, index, action);\n'
-     '                    dragStart(id, x, y, event.getEventTime());\n'
-     '                } else if (c == null && action == MotionEvent.ACTION_DOWN) {\n'),
-    ('                } else if (c == null) {\n                    forward(event, index, action);\n',
-     '                } else if (c == null) {\n                    forward(event, index, action);\n'
-     '                    dragStart(id, x, y, event.getEventTime());\n'),
-    ('                    if (c == null) forward(event, i, MotionEvent.ACTION_MOVE);\n',
-     '                    if (c == null) {\n'
-     '                        forward(event, i, MotionEvent.ACTION_MOVE);\n'
-     '                        if (id == dragId) dragMove(event.getX(i), event.getY(i), event.getEventTime());\n'
-     '                    }\n'),
-    ('                    if (c == null) { forward(event, i, all ? MotionEvent.ACTION_CANCEL : action); continue; }\n',
-     '                    if (c == null) {\n'
-     '                        forward(event, i, all ? MotionEvent.ACTION_CANCEL : action);\n'
-     '                        if (id == dragId) dragEnd();\n'
-     '                        continue;\n'
-     '                    }\n'),
-    ('        buttons |= face << 16;  // (only for the change check below)\n',
-     '        if (dragId >= 0 || camX != 0 || camY != 0) { rx = camX; ry = camY; }  // CaptainToadRecomp: camera drag\n'
-     '        buttons |= face << 16;  // (only for the change check below)\n'),
-    ('    private static void place(Control c, int w, int h, float s) {\n        c.cx = c.fx * w; c.cy = c.fy * h; c.r = c.fr * s;\n',
-     '    private static final float SIZE = 0.7f;  // CaptainToadRecomp: smaller controls\n\n'
-     '    private static void place(Control c, int w, int h, float s) {\n'
-     '        c.cx = c.fx >= 0 ? c.fx * s : w + c.fx * s; c.cy = c.fy >= 0 ? c.fy * s : h + c.fy * s; c.r = c.fr * s * SIZE;\n'),
-]
-# Settings menu: Captain Toad's build hides what only works with Wind Waker HD. The Saves tab (save
-# states and crash recovery restore Wind Waker HD memory), the Mods tab (its mods, catalogue and Cemu
-# packs), the frame-rate choice (interpolation from Wind Waker HD's 30 logic steps; Captain Toad
-# draws 60 itself) and the bloom and ambient-occlusion fixes made for Wind Waker HD's shaders.
-REPLACEMENTS['src/overlay/overlay.cpp'] = [
-    ('    if (ImGui::Begin("Wind Waker HD  -  Settings", &open, fl)) {\n',
-     '#ifdef CT_FOREIGN_GUEST\n'
-     '    if (ImGui::Begin("Captain Toad  -  Settings", &open, fl)) {\n'
-     '#else\n'
-     '    if (ImGui::Begin("Wind Waker HD  -  Settings", &open, fl)) {\n'
-     '#endif\n'),
-    ('            if (navigation_pressed(input_map::kPadLB)) U.select_tab = (U.tab + kTabs - 1) % kTabs;\n'
-     '            if (navigation_pressed(input_map::kPadRB)) U.select_tab = (U.tab + 1) % kTabs;\n',
-     '            if (navigation_pressed(input_map::kPadLB)) U.select_tab = (U.tab + kTabs - 1) % kTabs;\n'
-     '            if (navigation_pressed(input_map::kPadRB)) U.select_tab = (U.tab + 1) % kTabs;\n'
-     '#ifdef CT_FOREIGN_GUEST\n'
-     '            // L / R step over the hidden tabs in the direction pressed\n'
-     '            while (U.select_tab == kSaves || U.select_tab == kMods)\n'
-     '                U.select_tab = (U.select_tab + (navigation_pressed(input_map::kPadLB) ? kTabs - 1 : 1)) % kTabs;\n'
-     '#endif\n'),
-    ('                ImGuiTabItemFlags f = U.select_tab == i ? ImGuiTabItemFlags_SetSelected : 0;\n',
-     '#ifdef CT_FOREIGN_GUEST\n'
-     '                if (i == kSaves || i == kMods) continue;\n'
-     '#endif\n'
-     '                ImGuiTabItemFlags f = U.select_tab == i ? ImGuiTabItemFlags_SetSelected : 0;\n'),
-    ('    heading("Frame rate");\n', '#ifndef CT_FOREIGN_GUEST\n    heading("Frame rate");\n'),
-    ('    heading("Internal resolution");\n', '#endif\n    heading("Internal resolution");\n'),
-    ('    float bloom = render::bloom_strength() * 100.0f;\n',
-     '#ifndef CT_FOREIGN_GUEST\n    float bloom = render::bloom_strength() * 100.0f;\n'),
-    ('        post_changed([v] { render::set_ao_hires(v); });\n    ImGui::SameLine(0, 30);\n',
-     '        post_changed([v] { render::set_ao_hires(v); });\n    ImGui::SameLine(0, 30);\n#endif\n'),
-]
-# Gyro: the reference's 0.5 suits Wind Waker HD's first-person aiming; held at arm's length, a phone
-# turned too far for a little camera movement in Captain Toad. Saved settings keep their own value.
-REPLACEMENTS['src/motion/fusion.h'] = [
-    ('    static constexpr float kDefaultSensitivity = 0.5f,',
-     '    static constexpr float kDefaultSensitivity = 1.5f,  // CaptainToadRecomp (reference: 0.5)\n                           '),
-]
-# The PC route (this APK: the game copied over USB) is ready to play when the game folder has
-# Captain Toad's executable; the app icon then starts the game instead of the setup screen.
-REPLACEMENTS['../android/app/src/main/java/org/wwhdrecomp/wwhd/SetupActivity.java'] = [
-    ('                return external != null && new File(external, "game/code/cking.rpx").isFile();\n',
-     '                return external != null && new File(external, "game/code/Kinopio.rpx").isFile();\n'),
-    ('                    (external != null && new File(external, "game/code/cking.rpx").isFile()));\n',
-     '                    (external != null && new File(external, "game/code/Kinopio.rpx").isFile()));\n'),
-]
+# The reference's own extensions (tools/setup_reference.sh): a checkout reset since then would otherwise
+# build without strict HLE and recompile without the profile's hooks. Both are idempotent.
+for _tool in ('patch_reference.py', 'patch_diagnostic.py'):
+    subprocess.run([sys.executable, str(Path(__file__).resolve().parent / _tool), str(args.upstream)], check=True)
+
+# Exact-text changes, one module per area (tools/runtime_patches). Each reference file belongs to one
+# area, so its changes apply in the order written there.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from runtime_patches import android, core, graphics, ui  # noqa: E402
+REPLACEMENTS = {}
+for _area in (core, graphics, ui, android):
+    _shared = REPLACEMENTS.keys() & _area.REPLACEMENTS.keys()
+    if _shared:
+        raise SystemExit(f'{_area.__name__} changes files another area changes: {", ".join(sorted(_shared))}')
+    REPLACEMENTS.update(_area.REPLACEMENTS)
+
 # Exports that read state private to a reference source file are appended to that file.
 APPENDS = {
     'src/hle/ax.cpp': '''
@@ -335,7 +51,7 @@ HLE(snd_core, AXGetAuxCallback) {
 ''',
     'src/gx2/gx2_core.cpp': '''
 // ---- Captain Toad additions (CaptainToadRecomp tools/patch_runtime.py)
-HLE(gx2, GX2GetDisplayListWriteStatus) { ret(c, t_rec.start != 0); }  // this thread records a display list
+HLE(gx2, GX2GetDisplayListWriteStatus) { ret(c, recording() != nullptr); }  // this thread records a display list
 HLE(gx2, GX2SetDefaultState) { set_default_state(); }                 // the state GX2Init establishes
 ''',
     'src/gx2/gx2_state.cpp': '''
@@ -389,7 +105,58 @@ HLE(gx2, GX2SetTessellation) {}
 HLE(gx2, GX2SetMaxTessellationLevel) { set_reg(mmVGT_HOS_MAX_TESS_LEVEL, gx2::fbits(fa(c, 0))); }
 HLE(gx2, GX2SetMinTessellationLevel) { set_reg(mmVGT_HOS_MIN_TESS_LEVEL, gx2::fbits(fa(c, 0))); }
 ''',
+    'src/savestate.cpp': '''
+// ---- Captain Toad additions (CaptainToadRecomp tools/patch_runtime.py)
+namespace ss {
+// Captain Toad's frame start (runtime/ct_frame.cpp): the full save and load requests of service(); the
+// rest of it follows Wind Waker HD's scenes, events, portable states and automatic states.
+void ct_service(Cpu* c) {
+    (void)c;
+    // test aids (TV frames), as in service(): WWHD_STATE_SAVE_AT=frame:slot,... / WWHD_STATE_LOAD_AT
+    static const std::vector<Timed> save_at = parse_timed("WWHD_STATE_SAVE_AT"), load_at = parse_timed("WWHD_STATE_LOAD_AT");
+    if (!save_at.empty() || !load_at.empty()) {
+        static uint64_t last = 0;
+        const uint64_t f = render::frame_count();
+        for (auto& t : save_at)
+            if (t.frame > last && t.frame <= f) request_save_full(t.slot);
+        for (auto& t : load_at)
+            if (t.frame > last && t.frame <= f) request_load(t.slot);
+        last = f;
+    }
+    if (int slot = g_save_req.load()) {
+        if (do_save(slot)) {
+            g_save_req = 0;
+            g_attempts = 0;
+        }
+        return;
+    }
+    std::shared_ptr<Snapshot> s;
+    {
+        std::lock_guard<std::mutex> lk(g_mu);
+        s = g_load_ready;
+    }
+    if (s && do_load(s)) {
+        if (s->load_applied) {
+            g_last_load_frame = render::frame_count();
+            g_last_load_step = interp::logic_steps();
+        }
+        {
+            std::lock_guard<std::mutex> lk(g_mu);
+            g_load_ready.reset();
+        }
+        g_loading = false;
+        g_attempts = 0;
+    }
 }
+}  // namespace ss
+''',
+}
+# Captain Toad files that replace or join reference files
+for source, relative in (('cheats.cpp', 'src/mods/cheats.cpp'), ('ct_save.h', 'src/mods/ct_save.h'),
+                         ('ct_touch_menu.cpp', 'src/ct_touch_menu.cpp'), ('ct_touch_menu.h', 'src/ct_touch_menu.h')):
+    text = (Path(__file__).resolve().parent.parent / 'runtime' / source).read_text(encoding='utf-8')
+    (runtime / relative).write_text(text, encoding='utf-8', newline='\n')
+
 MARKER = '\n// ---- Captain Toad additions'
 for relative, text in APPENDS.items():
     path = runtime / relative
@@ -412,11 +179,69 @@ for relative, pairs in REPLACEMENTS.items():
         source = source.replace(old, new)
     path.write_text(source, encoding='utf-8', newline='\n')
 
+# Names the player sees (window titles, menus, dialogs, overlay, logs, crash reports) and the per-user
+# folders outside portable mode name Captain Toad. Only string literals change: comments keep naming
+# the reference code they describe, and the vendored third-party code is left alone.
+BRANDING = [
+    ('The Legend of Zelda: The Wind Waker HD', 'Captain Toad: Treasure Tracker'),
+    ('Wind Waker HD', 'Captain Toad'),
+    ('captures/wwhd', 'captures/captain-toad'),
+    ('./build/cmake/wwhd', 'captain-toad'),
+    ('Application Support/wwhd', 'Application Support/Captain Toad'),
+    ('Application Support/WWHD', 'Application Support/Captain Toad'),
+    ('Library/Caches/wwhd', 'Library/Caches/org.ctrecomp.captaintoad'),
+    ('/.config/wwhd', '/.config/captain-toad'),
+]
+literal = re.compile(r'"(?:[^"\\\n]|\\.)*"')
+def rebrand(match):
+    text = match.group(0)
+    if text == '"/wwhd"':  # $XDG_CONFIG_HOME/wwhd (platform/host.h)
+        return '"/captain-toad"'
+    if text == '"/WWHD"':  # %APPDATA%/WWHD (platform/host.h)
+        return '"/Captain Toad"'
+    for old, new in BRANDING:
+        text = text.replace(old, new)
+    return text
+for path in sorted((runtime / 'src').rglob('*')):
+    if path.suffix not in {'.c', '.cpp', '.h', '.mm'} or 'third_party' in path.parts:
+        continue
+    source = path.read_text(encoding='utf-8')
+    branded = literal.sub(rebrand, source)
+    if branded != source:
+        path.write_text(branded, encoding='utf-8', newline='\n')
+
+# The Android app's own text and save checks: its texts in every language, the save export/import
+# (Captain Toad's save is user/GameData.bin) and the setup notification. Java comments are left alone.
+ANDROID_BRANDING = [
+    ('The Wind Waker HD', 'Captain Toad: Treasure Tracker'),
+    ('Wind Waker HD', 'Captain Toad'),
+    ('code/cking.rpx', 'code/Kinopio.rpx'),
+    ('user/cking.sav', 'user/GameData.bin'),
+]
+android_main = runtime.parent / 'android/app/src/main'
+android_files = sorted(android_main.glob('res/values*/strings.xml')) + [
+    android_main / 'java/org/wwhdrecomp/wwhd' / name for name in ('SaveFiles.java', 'SetupService.java')]
+for path in android_files:
+    source = path.read_text(encoding='utf-8')
+    if path.suffix == '.java':
+        def android_rebrand(match):
+            text = match.group(0)
+            for old, new in ANDROID_BRANDING:
+                text = text.replace(old, new)
+            return text
+        branded = literal.sub(android_rebrand, source)
+    else:
+        branded = source
+        for old, new in ANDROID_BRANDING:
+            branded = branded.replace(old, new)
+    if branded != source:
+        path.write_text(branded, encoding='utf-8', newline='\n')
+
 STUBS = runtime / 'src/ct_guest_stubs.c'
 symbol = re.compile(r'\bf_([0-9A-F]{8})(_orig)?\b')
 fence = re.compile(r'\bT60_FENCE_(?:LINK|ANY)\(([0-9A-F]{8})')  # pastes f_<address>_orig
 names = set()
-for path in sorted(runtime.rglob('*')):
+for path in sorted((runtime / 'src').rglob('*')):  # sources built into the game executable
     if path.suffix in {'.c', '.cpp', '.h', '.mm'} and path != STUBS:
         text = path.read_text(encoding='utf-8', errors='replace')
         names.update(f'f_{address}{suffix}' for address, suffix in symbol.findall(text))

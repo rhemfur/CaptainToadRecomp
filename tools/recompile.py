@@ -1,9 +1,10 @@
-"""Translate the identified Captain Toad executable with an identity address map and no Zelda hooks."""
+"""Translate the identified Captain Toad executable with an identity address map and only its profile's hooks."""
 import argparse
 import inspect
 import json
 from pathlib import Path
 import sys
+import tempfile
 
 
 def main():
@@ -11,21 +12,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--upstream', type=Path, default=root / 'upstream')
     parser.add_argument('--game', type=Path, default=root / 'game')
-    parser.add_argument('--profile', type=Path, default=root / 'profiles/captain-toad-eur-v16.json')
+    parser.add_argument('--profile', type=Path, help='default: the profile in profiles/ whose RPX SHA-256 matches')
     parser.add_argument('--output', type=Path, default=root / 'build/gen')
     args = parser.parse_args()
     sys.path[:0] = [str(args.upstream / 'tools/recomp'), str(args.upstream / 'tools')]
     import builds
     from rpx import Rpx
     from recomp import Recompiler
-    profile = json.loads(args.profile.read_text(encoding='utf-8'))
-    rpx_path = args.game / 'code' / profile['rpx']
-    if builds.file_sha256(rpx_path) != profile['rpx_sha256']:
-        parser.error('RPX SHA-256 does not match the independently identified EUR v16 profile')
-    if profile['hooks']:
-        parser.error('this prototype intentionally requires an empty hook list')
+    paths = [args.profile] if args.profile else sorted((root / 'profiles').glob('*.json'))
+    profiles = [json.loads(p.read_text(encoding='utf-8')) for p in paths]
+    rpx_path = args.game / 'code/Kinopio.rpx'
+    sha = builds.file_sha256(rpx_path)
+    profile = next((p for p in profiles if p['rpx_sha256'] == sha), None)
+    if profile is None:
+        parser.error('RPX SHA-256 does not match an independently identified profile (' +
+                     ', '.join(p['name'] for p in profiles) + ')')
+    # Only Captain Toad's own hooks (the profile's, implemented in runtime/ct_frame.cpp); the reference's
+    # Wind Waker HD hook lists never apply.
+    for address in profile['hooks']:
+        if len(address) != 8 or int(address, 16) % 4:
+            parser.error(f'profile hook {address!r} is not a function address')
     if 'hook_paths' not in inspect.signature(Recompiler.__init__).parameters:
-        parser.error('reference recompiler is missing the explicit hook_paths extension')
+        parser.error('reference recompiler is missing the explicit hook_paths extension; '
+                     'run tools/setup_reference.sh (or .ps1) or tools/patch_runtime.py')
     if args.output.exists() and any(args.output.iterdir()):
         parser.error('output must be empty; use a new --output for another generation')
     rpx = Rpx(str(rpx_path))
@@ -37,10 +46,13 @@ def main():
                              'data_bounds': [f'{min(s.addr for s in data):08x}',
                                              f'{max(s.addr + s.size for s in data):08x}'],
                              'code_steps': [], 'data_steps': []})
-    compiler = Recompiler(str(rpx_path), identity, mod_hooks=False, hook_paths=[])
-    compiler.run(str(args.output), 30000)
+    with tempfile.TemporaryDirectory() as hooks_dir:
+        hooks_file = Path(hooks_dir) / 'hooks.txt'
+        hooks_file.write_text(''.join(f'{a}\n' for a in profile['hooks']), encoding='utf-8')
+        compiler = Recompiler(str(rpx_path), identity, mod_hooks=False, hook_paths=[str(hooks_file)])
+        compiler.run(str(args.output), 30000)
     summary = {'profile': profile, 'generated_functions': len(compiler.sorted_entries),
-               'zelda_hooks': len(compiler.hooks), 'instruction_hooks': len(compiler.sites),
+               'hooks': len(compiler.hooks), 'instruction_hooks': len(compiler.sites),
                'unhandled_instructions': dict(compiler.unhandled),
                'used_imports': len(compiler.used_imports),
                'warning': 'Translation and compilation do not establish executable correctness or game compatibility.'}

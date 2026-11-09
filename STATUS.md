@@ -2,7 +2,7 @@
 
 Updated October 11, 2026.
 
-**Linked with the full reference game runtime, Captain Toad plays its first level on a Windows ARM64 Snapdragon X PC: menus, cutscenes and the level render through Vulkan at about 60 frames per second, SDL input moves Captain Toad and progress is saved. Its audio mixer runs (not yet checked by ear). A private test APK of the same runtime runs on the Galaxy S25 Ultra: it renders the first level at 43–60 frames per second, a game controller connected to the phone plays it, and it saves; touch controls and audio on the phone are not checked yet. Stream-out output and a full playthrough are not done yet.**
+**Linked with the full reference game runtime, Captain Toad plays its first level on a Windows ARM64 Snapdragon X PC: menus, cutscenes and the level render through Vulkan at about 60 frames per second, SDL input moves Captain Toad and progress is saved. Its audio mixer runs (not yet checked by ear). A private test APK of the same runtime runs on the Galaxy S25 Ultra (EUR v16): it plays the levels at about 60 frames per second with a connected controller or the on-screen controls, a camera drag and the phone's gyro, and it saves. A private APK built on macOS (USA v16) runs the menus and levels at about 60 fps on a Pixel 9 Pro XL (Mali-G715). Stream-out output on Vulkan and a full playthrough are not done yet.**
 
 ## Completed
 
@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Play further levels with a real controller, produce stream-out output on the GPU, add small on-screen touch controls for the phone, and check audio, suspend/resume and longer play on the S25 Ultra.
+Play further levels with a real controller, produce stream-out output on the Vulkan renderer (Metal produces it), adapt the save import and export to Captain Toad's `GameData.bin`, and check audio, suspend/resume and longer play on the S25 Ultra.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -57,10 +57,11 @@ Reaching startup and compiling native code do not establish full game correctnes
 - `tools/recompile.py`: generation with SHA-256 validation and no Zelda hooks.
 - `tools/build_android.ps1` and `tools/build_windows.ps1`: reproducible builds.
 - `tools/run_android_diagnostic.ps1`: explicit-device ADB deployment and tests.
+- `tools/build_game_android.sh` and `tools/run_game_android.sh`: the private APK built, installed and started from macOS or Linux.
 - `patches/`: reference hook-list and strict-HLE extensions.
 - `local-reports/`: detailed manifests, audits and logs, kept outside Git.
 
-Pinned references: ZeldaWWHDRecomp `d23522eb1eb0fd676437a685016cf081f5ecf285`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
+Pinned references: ZeldaWWHDRecomp `59aa6ddeadd08b557a17743834a2d89a1d2dfc11`; cdecrypt `0ca58c66b0f23309c69b691caf6d39bf8868d96d`.
 
 ## GX2 resource bootstrap
 
@@ -82,6 +83,10 @@ On the Snapdragon X (Adreno X1-85) the game loaded its archives, initialized aud
 
 On October 11, 2026, on the S25 Ultra (Android 16, Adreno 830, Vulkan 1.3.284) the game loaded its archives, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin`. A 120-second run reached about 6,600 frames at 49–60 swaps per second (another run dipped to 43) with no missing import; screen captures show the first level and its Power Star scene, played with a game controller connected to the phone. The game looks up the error viewer's `ErrEulaSetVersion`, `ErrEulaPlayAppearSE` and `ErrEulaJump` through `OSDynLoad_FindExport`; the first two now change nothing, as in Cemu, and a jump stops. A call to any other unresolved dynamic export now stops the strict build instead of returning 0. A locked screen pauses the app and Samsung's process freezer stops it. Touch controls, audio output, suspend/resume and longer play on the phone remain unchecked.
 
-## Reference runtime moved to ZeldaWWHDRecomp d23522e
+## macOS build
 
-On October 14, 2026, the pinned reference moved to ZeldaWWHDRecomp `d23522e`: its newer recompiler, worker pipeline compilation, frame pacing, Android surface recovery, on-screen controls and controller dead zones. Regeneration produced the same 45,773 functions and 362 used imports. The app's launcher starts the game when `game/code/Kinopio.rpx` is present, the on-screen controls are drawn at 70% of their size in the corners with a dark body, a finger dragged outside them turns the camera in place of the right stick, the settings menu hides Wind Waker HD's save states, mods, frame-rate choice and shader fixes, the launcher icon comes from the game's `meta/iconTex.tga`, and `runtime/phone_motion.cpp` feeds the phone's motion sensors to the gyro while Settings > Controls > Gyro is "controller" and no controller has motion sensors (default sensitivity 1.5). On the S25 Ultra the build played about 26,700 frames, to the fifth level with a GameSir G8+ controller, at a median of 59.5 swaps per second (35 at the lowest) with no missing import. On October 30, 2026, the on-screen controls, the camera drag and the phone's gyro were played on the S25 Ultra and judged right. Save import/export (still Wind Waker HD's `cking.sav`) remains unadapted, and the Windows ARM64 build has not been rebuilt on this reference.
+`tools/build_game_macos.sh` makes a portable `build/game-macos/Captain Toad Treasure Tracker.app`. Its first start asks for the base game and v16 update (folders or archives), then extracts, merges, translates and compiles them with the patched runtime (Metal and Vulkan through MoltenVK, AppKit host); later starts launch the game. A USA v16 profile (`CT-USA-v16`) is identified next to the European one, and the MCP region follows the game's `meta/meta.xml`. On October 24, 2026 the USA game started on an Apple M3 Pro under Metal and Vulkan and ran 40–60 second tests without stopping; closing the window no longer reads the reference game's stage name. Menus, gameplay, input, audio output and saves on macOS remain unchecked.
+
+## Merged macOS, USA and Android work
+
+On November 9, 2026, the macOS, USA v16 and Android work (pull request #1) was merged: the reference moved to ZeldaWWHDRecomp `59aa6dd`, the runtime patches are split by area (`tools/runtime_patches`), and USA v16 gained save states, a wider picture and cheats through its profile's hooks. On top of it, Captain Toad's Android app keeps its on-screen controls in the corners with a dark body, turns the camera with a finger dragged outside them (taps still touch the GamePad), defaults the phone's gyro to sensitivity 1.5, and, in a build without the frame and camera hooks (EUR v16 so far), says save states are unavailable and keeps the picture 16:9. The EUR v16 APK was played on the Galaxy S25 Ultra with no missing import; the corner layout, camera drag, taps, gyro, Saves notice and 16:9 picture were checked there. EUR save states and a wider EUR picture need its own frame and camera hooks.

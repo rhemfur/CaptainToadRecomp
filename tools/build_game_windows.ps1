@@ -23,7 +23,7 @@ $taskBin = Join-Path $LlvmMingw 'bin'
 $env:PATH = $taskBin + ';' + $env:PATH
 # Strict HLE stops at the first missing import; foreign-guest mode keeps Wind Waker HD addresses out.
 $taskFlags = '-DCT_DIAGNOSTIC_STRICT_HLE=1 -DCT_FOREIGN_GUEST=1'
-$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
+$taskExtra = @('fast_mutex.cpp', 'mcp.cpp', 'reference_hle.cpp', 'ct_frame.cpp', 'ct_prompts.cpp' | ForEach-Object { (Join-Path $taskRoot "runtime\$_") -replace '\\', '/' }) -join ';'
 $taskArgs = @('-S', (Join-Path $taskRoot 'upstream'), '-B', $taskBuild, '-G', 'Ninja',
     "-DCMAKE_MAKE_PROGRAM=$(Join-Path $CMakeRoot 'Ninja\ninja.exe')",
     "-DCMAKE_C_COMPILER=$(Join-Path $taskBin "$Target-w64-mingw32-clang.exe")",

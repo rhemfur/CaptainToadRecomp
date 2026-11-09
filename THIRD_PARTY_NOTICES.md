@@ -3,7 +3,7 @@
 ## ZeldaWWHDRecomp
 
 - Source: https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp
-- Pinned reference commit: `d23522eb1eb0fd676437a685016cf081f5ecf285`.
+- Pinned reference commit: `59aa6ddeadd08b557a17743834a2d89a1d2dfc11`.
 - License: Mozilla Public License 2.0.
 - `patches/recompiler-hook-paths.patch` modifies `tools/recomp/recomp.py` to accept an explicit hook list. Omitting the argument preserves the original behavior.
 - `patches/strict-diagnostic-hle.patch` modifies `runtime/src/core.cpp` only when `CT_DIAGNOSTIC_STRICT_HLE` is enabled.

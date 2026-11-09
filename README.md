@@ -14,9 +14,11 @@ cd CaptainToadRecomp
 powershell -ExecutionPolicy Bypass -File tools/setup_reference.ps1
 ```
 
+On macOS or Linux, run `sh tools/setup_reference.sh` instead; it does the same.
+
 The setup script downloads the pinned runtime/recompiler commit and applies the hook-list and strict diagnostic extensions. It preserves an existing checkout and refuses to change a different revision automatically.
 
-Supply your own Captain Toad Wii U EUR game and v16 update, extracted separately into `code/content/meta` directory trees. [cdecrypt](https://github.com/VitaSmith/cdecrypt) supports NUS installation packages. This repository does not include the game, tickets, keys or the extractor.
+Supply your own Captain Toad Wii U game (EUR or USA) and its v16 update, extracted separately into `code/content/meta` directory trees. [cdecrypt](https://github.com/VitaSmith/cdecrypt) supports NUS installation packages. This repository does not include the game, tickets, keys or the extractor.
 
 Place the extracted trees in `work/extracted/base` and `work/extracted/update`, then run:
 
@@ -46,7 +48,7 @@ Game files, tickets, keys, generated game code, builds and local reports are exc
 
 ## Pinned references
 
-- [ZeldaWWHDRecomp](https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp), commit `d23522eb1eb0fd676437a685016cf081f5ecf285`. Its MPL-2.0 license and credits remain in the reference checkout.
+- [ZeldaWWHDRecomp](https://github.com/ZeldaWWHDRecomp/ZeldaWWHDRecomp), commit `59aa6ddeadd08b557a17743834a2d89a1d2dfc11`. Its MPL-2.0 license and credits remain in the reference checkout.
 - [cdecrypt](https://github.com/VitaSmith/cdecrypt), commit `0ca58c66b0f23309c69b691caf6d39bf8868d96d`, used for the initial local extraction. Its original license remains in the separate `work/cdecrypt` checkout.
 
 The reference recompiler accepts an optional `hook_paths` argument. Omitting it preserves the original behavior; passing `[]` explicitly disables all hooks. This prototype always uses `[]`, so Zelda-specific addresses and hooks are not applied to Captain Toad. `tools/patch_reference.py` reproduces this extension and rejects an unexpected source layout.
@@ -83,7 +85,7 @@ python tools/patch_reference.py upstream
 python tools/recompile.py --output build/gen-new
 ```
 
-The generator rejects an RPX whose SHA-256 differs from the identified profile. Do not select Zelda's USA profile to bypass this check.
+The generator rejects an RPX whose SHA-256 differs from the identified profile. Do not select another game's profile to bypass this check.
 
 The default Android build uses SDK `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2`, Android API 33 and ABI `arm64-v8a`. These are prototype build parameters, not a list of verified compatible devices.
 
@@ -132,7 +134,7 @@ Validation on October 10, 2026:
 - `OSWaitRendezvous` waits for the cores in its mask, as Cemu does. The reference counted arrivals, which let the main thread use the sound system before the audio launch thread had initialized it.
 - CPU surface copies identify depth surfaces by their depth-buffer usage flag, not by the 0x800 float-format bit, so R16G16 float copies work.
 - `runtime/reference_hle.cpp` and the appended blocks add imports the reference lacks, following Cemu: amiibo detection without figures, the error viewer's version and appear sound (found through `OSDynLoad_FindExport`; a jump to another application stops), no GamePad microphone, absent saves of other titles (Super Mario 3D World), GX2 polygon offset, cull/depth-only controls, point limits, restart index, display-list status, default state and tessellation levels.
-- Stream out follows Cemu's command semantics: `GX2SetStreamOutBuffer` sets each buffer's base and size, `GX2SetVertexShader` sets the vertex strides, `GX2SetStreamOutContext` and `GX2SaveStreamOutContext` reset, load or save the write offset on the render thread in command order, and each stream-out draw advances the offsets by the bytes its vertices emit. The renderer still skips those rasterizer-killed draws, so their vertex output is not produced and the buffers keep their previous contents. The first such draw logs this.
+- Stream out follows Cemu's command semantics: `GX2SetStreamOutBuffer` sets each buffer's base and size, `GX2SetVertexShader` sets the vertex strides, `GX2SetStreamOutContext` and `GX2SaveStreamOutContext` reset, load or save the write offset on the render thread in command order, and each stream-out draw advances the offsets by the bytes its vertices emit. On Metal (macOS) the vertex shaders write that output on the GPU, as Cemu's Metal renderer does: each shader stores its stream-out vertices through a device pointer at the buffer's write offset, dropping writes past the buffer's end as the hardware does. The output goes to a GPU shadow of each buffer, never into guest memory (the GPU runs a frame behind the game, which reuses these small buffers from per-frame memory), and draws of that frame and the next read the shadow; and draws with rasterization disabled run alone in a pass without attachments (`[gfx] stream-out: vertex shaders write their buffers on the GPU`). The Vulkan renderer (Windows, Android) still skips those draws, so there the buffers keep their previous contents.
 
 The build is strict: it stops at the first missing import, including a call to a dynamic export that `OSDynLoad_FindExport` could not resolve (the reference, like Cemu, returned 0 there). Tested with llvm-mingw 20260922 (aarch64), the Visual Studio Build Tools CMake/Ninja and Vulkan headers:
 
@@ -143,7 +145,40 @@ build/game-windows/wwhd.exe --game game
 
 On October 10, 2026, on a Snapdragon X PC (Adreno X1-85, Vulkan 1.3.295), the game loaded its shader, layout, font and localized message archives, initialized audio and its worker threads, faded in the title screen and played the opening cutscene on the TV and GamePad views at 46–60 frames per second. It looked up a Super Mario 3D World save, found none and continued to the episode book menu, about 4,000 frames after startup. Idle at the book, it plays its attract demo of the first level, collecting coins, gems and the Power Star.
 
-Input was checked with the reference's scripted test input, timed from the book (`WWHD_TEST_ORIGIN=4000`): A opens the book at Plucky Pass Beginnings, a second A starts the level, and holding the left stick walks Captain Toad away from the start, collecting four coins. The same script without the stick leaves him at the start with no coins. The game writes `save/user/GameData.bin` next to the executable. Runs of up to 140 seconds, including a level, hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. Window titles and logs still use the reference's Wind Waker HD naming.
+Input was checked with the reference's scripted test input, timed from the book (`WWHD_TEST_ORIGIN=4000`): A opens the book at Plucky Pass Beginnings, a second A starts the level, and holding the left stick walks Captain Toad away from the start, collecting four coins. The same script without the stick leaves him at the start with no coins. The game writes `save/user/GameData.bin` next to the executable. Runs of up to 140 seconds, including a level, hit no missing import. The executable and any frame captures contain recompiled game code or game imagery and stay local. `tools/patch_runtime.py` renames the runtime's window titles, menus, dialogs, overlay, logs and per-user folders for Captain Toad.
+
+## Run the game (macOS)
+
+`tools/build_game_macos.sh` makes `build/game-macos/Captain Toad Treasure Tracker.app` for Apple Silicon Macs, a portable app. Its first start asks for your base game and v16 update, each as an extracted folder (`code`, `content`, `meta`) or a `.rar`, `.zip` or `.7z` archive of one, then prepares the game on the Mac: it extracts the archives, merges the update over the base game, translates `Kinopio.rpx` and compiles the patched reference runtime with it. Later starts launch the game directly; hold Shift while starting it to run the setup again. The runtime has the Metal renderer and the Vulkan renderer through MoltenVK in one executable, with the AppKit host (TV/GamePad windows, menus, controls window, input, audio).
+
+```sh
+xcode-select --install
+brew install cmake ninja vulkan-headers vulkan-loader molten-vk glslang zstd
+sh tools/build_game_macos.sh
+open "build/game-macos/Captain Toad Treasure Tracker.app"
+```
+
+The app runs this repository's tools, so keep the repository where it is. Everything the setup and the game create stays in `build/game-macos/data/`: the prepared game, the generated code, the runtime (`bin/Captain Toad Treasure Tracker.app`, shown as Captain Toad: Treasure Tracker, with an icon made from the game's own title art), saves (`save/`), the setup log and, through `WWHD_USER_DIR`, settings, controls, save states, shader caches and logs (`user/`). The icon, like everything else made from the game, stays in `build/` and is never committed. Nothing is written to the per-user Library folders or user defaults. The data folder contains game files and recompiled game code: keep it local.
+
+The same steps without the app: `sh tools/setup_game_macos.sh build/game-macos/data <base> <update>`. `tools/build_runtime_macos.sh` rebuilds only the runtime; `CT_RENDERER=METAL` or `CT_RENDERER=VULKAN` (SDL3 host, also needs `brew install sdl3 lz4`) builds a single renderer.
+
+**Mods.** Settings (F1) > Mods installs Captain Toad mods from a file or folder (More > Install from a file or folder) and lists them under Installed, to switch on or off; changes apply after a restart. A mod is a package with `"game_id": "captain-toad"` in its `manifest.json`, or a folder the importer recognises: a content tree that mirrors the game's `content/` folder (SDCafiine style), or a Cemu graphic pack (`rules.txt` with texture rules; shader packs need the Vulkan renderer). The game then reads the mod's files instead of its own. Wind Waker HD packages are refused, and Cemu `patches.txt` code patches are not applied. `sh tools/fetch_cemu_packs_macos.sh` installs the Captain Toad pack from Cemu's community graphic packs (CC0) that works here, Shadow Resolution, switched off. Installed mods live in `data/user/ModManager`.
+
+Both the European (`CT-EUR-v16`) and the American (`CT-USA-v16`) v16 update are identified; `tools/prepare_game.py` and `tools/recompile.py` select the matching profile. The USA executable translates to the same 45,773 functions, 362 used imports and 36 primary-opcode-0 words as the European one. `runtime/mcp.cpp` reports the game's own region from `meta/meta.xml`; with the fixed European region the USA game found no message archive and stopped during startup.
+
+On October 24, 2026, on an Apple M3 Pro with macOS 27.0.1, the app's setup prepared the USA game and v16 update (1,567 files) and compiled it in about a minute. The game started on Metal and on Vulkan through MoltenVK, initialized CoreAudio and ran for 40–60 seconds per test (3,000 frames at about 58 frames per second at 1x internal resolution on Metal) without stopping. Menus, gameplay, input, audio output and saves on macOS have not been checked yet.
+
+Metal is the default renderer. Choose Vulkan with *Graphics > Renderer*. Dynamic resolution starts on (down to 0.75 of the internal resolution), so scenes the GPU cannot draw in time cost resolution instead of frame rate.
+
+The *Gameplay* menu and the settings overlay's *Cheats* edit the save (`save/user/GameData.bin`, kept as `GameData.bin.before-cheats` before the first cheat) and restart the game: unlock every episode and course, clear every course, every Super Gem, every bonus objective, every challenge time, every Pixel Toad and 100% completion. The course list comes from the game's `content/SystemData/StageList.szs`; the save layout follows the CTSe save editor's description. Clearing episode 3's final course also marks the ending as seen, as the game does after the credits: a save with that course cleared and the ending unseen makes the episode book fail.
+
+Settings > Display > Window size gives the TV window 1280x720, 1600x900, 1920x1080, 2560x1440 or 3840x2160 pixels inside, the sizes that fit its screen (macOS and Windows, out of full screen). With the Vulkan renderer, Settings > Graphics > Internal resolution > *Screen* draws the game with as many pixels as its window shows. Neither has been tested on a Mac or a Windows PC yet.
+
+Gyro controllers: on macOS, Windows and Linux, Settings > Controls > Gyro starts at *Controller gyro*, so a controller with motion sensors (DualSense, DualShock 4, Switch Pro Controller, Joy-Con, Steam Deck and others) moves the virtual GamePad as the phone's gyro does on Android; *Cemuhook (DSU)* takes the motion from a DSU server app instead. This is the reference runtime's own gyro support (SDL3 sensors, GameController.framework on macOS); it has not been tried with Captain Toad on a desktop yet.
+
+On Linux, `tools/build_game_linux.sh` builds the same runtime (Vulkan, SDL3 host) from `build/gen` as `build/game-linux/wwhd`; run it with `--game <prepared game folder>`. The script lists the packages it needs. Controller gyro needs read access to `/dev/hidraw*` (Steam's udev rules give it). On Ubuntu 24.04 every source file compiles; linking and running with real generated code have not been tried.
+
+In the TV window, the picture-in-picture GamePad (Display > GamePad screen > Picture in picture) can be moved by dragging it with the right mouse button or with Option held, resized by dragging its bottom-right corner the same way or by scrolling over it; the placement is saved. A plain click on it stays a GamePad touch.
 
 ## Build the Android test APK
 
@@ -156,25 +191,40 @@ powershell -ExecutionPolicy Bypass -File tools/run_game_android.ps1 -PushGame
 
 The scripts default to the SDK in `C:\Android\Sdk`, NDK `30.0.16248370`, CMake `4.1.2` and the JDK in `JAVA_HOME`, else Android Studio's (`-JavaHome` overrides it). The APK contains recompiled game code: keep it on your own devices.
 
-The run script wakes the phone and stops if it is locked: a locked screen pauses the app at once and Samsung's process freezer then stops the game. It ends any earlier run, starts the app, waits `-LogSeconds` (default 60) and also pulls the runtime's own `captures/wwhd.log`, which the Android runtime writes only when `env.txt` in the app folder sets `WWHD_LOG_FILE`; the script creates that `env.txt` if the phone has none.
+The run script wakes the phone and stops if it is locked: a locked screen pauses the app at once and Samsung's process freezer then stops the game. It ends any earlier run, starts the app, waits `-LogSeconds` (default 60) and also pulls the runtime's own `captures/captain-toad.log`, which the Android runtime writes only when `env.txt` in the app folder sets `WWHD_LOG_FILE`; the script creates that `env.txt` if the phone has none.
 
 On October 11, 2026, the APK was built on a Windows x64 PC (Microsoft JDK 21, Gradle 8.12) and run on the Galaxy S25 Ultra (SM-S938B, Android 16, Adreno 830 with Vulkan 1.3.284). The game loaded `Kinopio.rpx` and its archives, started its worker and audio threads, rendered through Vulkan to a 2340x1080 swapchain and wrote `save/user/GameData.bin` in the app folder. A 120-second run reached about 6,600 frames at 49–60 swaps per second with no missing import; screen captures show the first level and its Power Star scene. During that run the first level was played with a game controller connected to the phone. Touch controls, audio output, suspend/resume and longer play on the phone have not been checked yet. The reference's settings overlay (still named Wind Waker HD) opens over the game; its save states depend on Wind Waker HD addresses and must not be used.
 
-### On the reference's current main
+On macOS (and Linux), `tools/build_game_android.sh` and `tools/run_game_android.sh` do the same from the code the macOS app generated (`build/game-macos/data/gen` and `game`). They need the Android SDK with platform 36, build tools 35.0.0 and NDK `30.0.16248370` (Android Studio's, or Homebrew's `android-commandlinetools` with `sdkmanager`), a JDK 17 to 21 for Gradle 8.12 (`brew install openjdk@21`), CMake, Ninja and Python 3. Pillow, if installed, makes the launcher icon from your own game's title screen (`android/app/local-res`, never committed). Wireless debugging works: `adb connect <phone address>`, then pass `--serial`:
 
-On October 14, 2026, the pinned reference moved from `defb89f` to ZeldaWWHDRecomp `d23522e` for its newer recompiler (guest registers in C locals, condition-register liveness), Vulkan pipeline compilation on workers, frame pacing, Android surface recovery, on-screen controls and controller dead zones. Our patches apply unchanged except one reworded error report; none of Captain Toad's added imports exists in the reference yet. Regeneration produced the same 45,773 functions, 362 used imports and 36 primary-opcode-0 words. Additions for the Android app:
+```sh
+tools/build_game_android.sh
+tools/run_game_android.sh --push-game --serial <adb serial>   # --push-save copies your save too
+```
 
-- The reference's launcher activity starts the game when the PC route's game folder has `code/Kinopio.rpx` (it looked for Wind Waker HD's `cking.rpx`).
-- The reference's on-screen controls are drawn at 70% of their size, with a dark translucent body (white controls vanished on Captain Toad's white title screen), and kept in the corners in units of the screen's short side: the left stick and D-pad bottom left, A/B/X/Y close together bottom right, ZL/L and R/ZR at the top corners with -/+ under R/ZR. The right stick is replaced by a camera drag: a finger moved anywhere outside the controls turns the camera with its speed and stops when it stops; the touch still reaches the game.
-- `tools/build_game_android.ps1` makes the launcher icon from the game's own `meta/iconTex.tga` with the reference's `android/make_icon.py`.
-- The settings menu is titled Captain Toad and hides what only works with Wind Waker HD: the Saves tab (save states and crash recovery), the Mods tab, the frame-rate choice (interpolation from 30 logic steps; Captain Toad draws 60 itself) and the bloom and ambient-occlusion fixes. Holding - for half a second opens it.
-- `runtime/phone_motion.cpp` feeds the phone's gyroscope and accelerometer to the reference's motion module, turned to the screen's orientation, while Settings > Controls > Gyro is "controller" and no connected controller has motion sensors. The default gyro sensitivity is 1.5 (the reference's 0.5 needed the phone turned too far).
+Tested on a Pixel 9 Pro XL (Tensor G4, Mali-G715, Android 17): the title screen, menus and levels run at about 60 fps through Vulkan. On Android the phone's screen starts as the GamePad, so a touch anywhere on the picture is a GamePad touch, and touches on the TV picture touch the GamePad at the same place (the TV shows the GamePad's picture in this game). Android's Back gesture opens Settings. Long-press the app icon to export or import the save (`user/GameData.bin`).
 
-On the S25 Ultra this build played about 26,700 frames (to the fifth level, with a GameSir G8+ controller) at a median of 59.5 swaps per second, 35 at the lowest, with no missing import. On October 30, 2026, the on-screen controls, the camera drag and the phone's gyro at sensitivity 1.5 were played on the S25 Ultra and judged right. The reference's save import and export still look for Wind Waker HD's `cking.sav` and do not handle Captain Toad's `GameData.bin`. The Windows ARM64 results above predate this reference; that build has not been rebuilt on it yet.
+The game files and the save live in the app's own folder, `Android/data/org.ctrecomp.captaintoad/files` (`game/`, `save/`, `config/`), which Android deletes with the app; nothing in the app writes elsewhere except a save you export to Downloads. Android's app backup keeps the save and `settings.ini` (`data_extraction_rules.xml`), so they can come back when the app is installed again.
+
+Tested on a Pixel 9 Pro XL. One menu button (☰) in the top left corner replaces the view button, the touch controls' show/hide button and the tilt button. Its menu opens Settings, moves and resizes the touch controls (a long press on the button does too), turns the phone's gyro camera on or off (Settings > Controls > Gyro, "device") and applies the save cheats; on Android a cheat closes the game, and the next start plays with it. Display options live in Settings > Display only: the view (GamePad only, TV with the GamePad in a corner, TV only), the picture shape, the touch controls and their opacity, and the camera cutout (*Use the area* draws up to the screen's edge around a punch-hole or notch camera; *Keep clear* leaves a black bar along that edge; from Android 15 the game's layout is padded by the cutout's size, since apps can no longer keep their window out of it). The internal resolution starts at *Screen* on Android: the picture on screen is drawn with as many pixels as it covers on the phone's display (Settings > Graphics; dynamic resolution still lowers it when the GPU cannot keep up).
+
+Internal resolution *Screen* (Settings > Graphics, and the macOS Graphics menu): the picture is drawn with as many pixels as it covers on screen, up to 4x. Captain Toad draws its course once, into the TV's buffers, and copies it to the GamePad, so in GamePad only the GamePad's buffers get the factor for the lines they cover (up to 4x) and the TV's the factor that fills them and no more: on a 5K screen the GamePad picture is 3416x1920 and the TV source 3360x1890, sharp and at 60 fps on an M3 Pro, where a fixed 3x draws both screens at 3x. In TV only the GamePad's buffers, shown nowhere, draw at 1x. Checked on macOS (Metal).
+
+Picture shape (Settings > Display, every platform): 16:9 as on the Wii U, *Match screen* (Android) or *Match window* (desktop), 16:10, 21:9 or 32:9. Wider shapes show more of the course at the sides with nothing stretched, on the TV and the GamePad: the runtime widens the screen-sized buffers, and the game's camera aspect (USA v16 0x023734F8, a profile hook in runtime/ct_frame.cpp) and three 16:9 constants take the new shape, the same places Cemu's community Resolution pack patches. The camera takes a new shape when the next course starts. Touches reach the GamePad's middle 16:9. Android starts with *Match screen*. Checked at 21:9 on macOS (the attract demo's course) and at the phone's shape on a Pixel 9 Pro XL in a course; the EUR build has no camera hook yet, so its picture keeps 16:9 whatever the setting (a wider shape would stretch its 16:9 camera). `CT_LOG_ASPECT=1` logs each camera's viewport and aspect.
+
+On November 9, 2026, after merging that work, the EUR v16 APK built on Windows from ZeldaWWHDRecomp `59aa6dd` was played on the Galaxy S25 Ultra with no missing import. Captain Toad's own Android additions on top of it:
+
+- The on-screen controls' default layout keeps them in the corners at 70% of the reference's size with a dark translucent body (translucent white vanished on the white title screen): the left stick and D-pad bottom left, A/B/X/Y close together bottom right, ZL/L and R/ZR at the top corners with -/+ under R/ZR. ☰ > Move and resize touch controls starts from these places.
+- The right stick is replaced by a camera drag: a finger on no control first touches the GamePad; once it moves past a small slop the GamePad touch is cancelled and the finger's speed turns the camera, which stops when the finger stops. Taps and holds on the picture still reach the game.
+- The phone's gyro (☰ > Tilt camera) defaults to sensitivity 1.5 (the reference's 1.0 needed the phone turned too far).
+- In a build without the frame hook (EUR v16 so far) the Saves tab says save states are not available instead of offering slots that never save, and the picture keeps 16:9.
+- A call to a dynamic export without HLE stops the strict build, like a missing static import.
+
+On the S25 Ultra the corner layout, the camera drag with taps on the picture, the phone's gyro, the Saves tab notice and the 16:9 picture were checked in play.
 
 ## Next step: stream-out output, a longer playthrough and Android
 
-Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the GPU: a vertex-only pipeline without rasterization that writes Cemu's storage-buffer stream-out path, read back into guest memory. On Android, adapt the reference's save import and export to Captain Toad's `GameData.bin`, then check audio, suspend/resume and longer play on the S25 Ultra.
+Play further levels with a real controller to find the next missing imports and rendering differences. Produce stream-out output on the Vulkan renderer too (done on Metal): its vertex data is uploaded from guest memory rather than mapped, so the output must be written to a GPU buffer and either copied back to guest memory or used in place by later draws. Android needs the same runtime built as the reference's SDL activity library, then a private test APK. Audio quality, saves, suspend/resume behavior and performance on the S25 Ultra remain to be validated.
 
 The headless diagnostic's own GX2 bridge stays as a resource-level test target. The Switch decompilation may help identify equivalent functions, but no code from that project has been incorporated.
 
