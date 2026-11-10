@@ -8,8 +8,14 @@
 #include "runtime.h"
 #include "aspect.h"
 
+#include "audio_out.h"
+
+#include <SDL3/SDL.h>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <thread>
 
 namespace ss { void ct_service(Cpu* c); }  // savestate.cpp, Captain Toad additions (tools/patch_runtime.py)
 
@@ -41,7 +47,36 @@ static void ct_aspect_constants() {
 // a save request would wait for ever: the Saves tab says so instead (tools/runtime_patches/ui.py).
 extern "C" bool ct_save_states_available() { return f_02420F10_orig != nullptr; }
 
+// Background pause (Android): when the app leaves the screen the game's main thread waits here, at the
+// start of the frame, until it is back, so the game does not go on playing unseen. Measured on the S25
+// before this: the game kept running while away, and the audio device, paused by the system, came back
+// with its 680 ms queue full of old sound; the queue is dropped when the game goes on. The events come
+// through an event watch (SDL's event queue is not read while the app is in the background).
+// CT_NO_BACKGROUND_PAUSE=1 turns it off.
+static std::atomic<bool> g_ct_background{false};
+static bool SDLCALL ct_lifecycle_watch(void*, SDL_Event* e) {
+    if (e->type == SDL_EVENT_WILL_ENTER_BACKGROUND || e->type == SDL_EVENT_DID_ENTER_BACKGROUND)
+        g_ct_background.store(true);
+    else if (e->type == SDL_EVENT_DID_ENTER_FOREGROUND)
+        g_ct_background.store(false);
+    return true;
+}
+static void ct_background_pause() {
+    static const bool watching = [] {
+        if (std::getenv("CT_NO_BACKGROUND_PAUSE")) return false;
+        return SDL_AddEventWatch(ct_lifecycle_watch, nullptr);
+    }();
+    if (!watching || !g_ct_background.load()) return;
+    LOG("[ct] app in the background: game paused");
+    const auto start = std::chrono::steady_clock::now();
+    while (g_ct_background.load()) std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    audio::flush();
+    LOG("[ct] app in the foreground: game resumed after %.1f s, audio queue dropped",
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+}
+
 extern "C" void hook_02420F10(Cpu* c) {
+    ct_background_pause();
     ss::ct_service(c);
     ct_aspect_constants();
     f_02420F10_orig(c);

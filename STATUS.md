@@ -41,7 +41,7 @@ The translator reported 36 words with primary opcode 0 and two calls to undefine
 
 ## Next milestone
 
-Play further levels with a real controller, produce stream-out output on the Vulkan renderer (Metal produces it), adapt the save import and export to Captain Toad's `GameData.bin`, and check audio, suspend/resume and longer play on the S25 Ultra.
+Play further levels with a real controller, produce stream-out output on the Vulkan renderer (Metal produces it), adapt the save import and export to Captain Toad's `GameData.bin`, and check longer play on the S25 Ultra.
 
 Reaching startup and compiling native code do not establish full game correctness. The diagnostic intentionally stops at unsupported APIs rather than returning fabricated success.
 
@@ -94,3 +94,7 @@ On November 9, 2026, the macOS, USA v16 and Android work (pull request #1) was m
 ## EUR save states and wide picture
 
 EUR v16 hooks the same per-frame and camera functions as USA v16 (`02420F10`, `023734F8`): its code has the same layout there. The three 16:9 constants and the camera function's instructions are at the same addresses, Cemu's `KinopioAspectUWv16` patch names one set of addresses for every v16 region, the save states' return addresses follow the same calls, and the per-frame function's call tree reaches `GX2SwapScanBuffers`. On the Galaxy S25 Ultra a full save state (320 MB) was written in 0.48 s and loaded back in 0.64 s with play continuing, and *Match screen* filled the 2340x1080 screen on the title screen and the fountain hub with nothing stretched.
+
+## Leaving the app on Android
+
+On November 10, 2026, on the Galaxy S25 Ultra, the game kept playing while the app was in the background, and the audio came back with 680 ms of old sound queued. The frame hook (`runtime/ct_frame.cpp`, EUR and USA v16) now holds the game's main thread while the app is away and drops the audio queue on return. In two 30-second cycles the same process came back with the game where it was left and the audio queue at its usual 25–50 ms at once; in play the queue stayed there with no dropped audio, and the sound was checked by ear.
