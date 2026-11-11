@@ -253,3 +253,42 @@ REPLACEMENTS[_touch] += [
      '        if (dragging || camX != 0 || camY != 0) { rx = camX; ry = camY; }  // CaptainToadRecomp: camera drag\n'
      '        buttons |= face << 16;  // (only for the change check below)\n'),
 ]
+
+# The layout editor's bar in the settings window's style (dark blue panel, rounded buttons with light
+# text) instead of Android's white buttons, floating in the middle of the screen: the default layout
+# keeps the middle free, so the bar no longer covers the top row or pushes those controls under it.
+_bar_bg, _bar_edge, _btn_bg = '0xF0102F42', '0xFF2A7A9A', '0xFF1E5A78'
+REPLACEMENTS[_touch] += [
+    ('            p=TouchLayout.fit(p,w,h,editor.editing() && editorBar!=null ? editorBar.getBottom():0);\n',
+     '            p=TouchLayout.fit(p,w,h,0);  // CaptainToadRecomp: the editor\'s bar floats in the middle\n'),
+    ('                w,h,editorBar!=null ? editorBar.getBottom():0);\n',
+     '                w,h,0);  // CaptainToadRecomp: the editor\'s bar floats in the middle\n'),
+    ('        editorBar.setBackgroundColor(0xEE123340);\n',
+     '        // CaptainToadRecomp: the settings window\'s style\n'
+     '        final float dp=getResources().getDisplayMetrics().density;\n'
+     '        android.graphics.drawable.GradientDrawable panel=new android.graphics.drawable.GradientDrawable();\n'
+     f'        panel.setColor({_bar_bg});panel.setCornerRadius(10*dp);panel.setStroke((int)(2*dp),{_bar_edge});\n'
+     '        editorBar.setBackground(panel);\n'
+     '        editorBar.setPadding((int)(10*dp),(int)(8*dp),(int)(10*dp),(int)(8*dp));\n'),
+    ('        hint.setTextColor(0xFFFFFFFF);hint.setGravity(android.view.Gravity.CENTER);\n',
+     '        hint.setTextColor(0xFFFFFFFF);hint.setGravity(android.view.Gravity.CENTER);\n'
+     '        hint.setTypeface(android.graphics.Typeface.MONOSPACE);hint.setPadding(0,0,0,(int)(6*dp));\n'),
+    ('        RelativeLayout.LayoutParams lp=new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);\n'
+     '        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);\n',
+     '        RelativeLayout.LayoutParams lp=new RelativeLayout.LayoutParams(Math.round(Math.max(getWidth(),getHeight())*0.48f),ViewGroup.LayoutParams.WRAP_CONTENT);\n'
+     '        lp.addRule(RelativeLayout.CENTER_IN_PARENT);  // CaptainToadRecomp: clear of the corners\' controls\n'),
+    ('        Button b=new Button(getContext());b.setText(label);b.setOnClickListener(v->action.run());\n'
+     '        b.setMinHeight((int)(48*getResources().getDisplayMetrics().density));\n'
+     '        bar.addView(b,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));\n',
+     '        Button b=new Button(getContext());b.setText(label);b.setOnClickListener(v->action.run());\n'
+     '        final float dp=getResources().getDisplayMetrics().density;\n'
+     '        b.setMinHeight((int)(48*dp));\n'
+     '        // CaptainToadRecomp: the settings window\'s buttons\n'
+     '        android.graphics.drawable.GradientDrawable face=new android.graphics.drawable.GradientDrawable();\n'
+     f'        face.setColor({_btn_bg});face.setCornerRadius(6*dp);face.setStroke((int)dp,{_bar_edge});\n'
+     '        b.setBackground(face);b.setTextColor(0xFFFFFFFF);b.setAllCaps(false);\n'
+     '        b.setTypeface(android.graphics.Typeface.MONOSPACE);b.setStateListAnimator(null);\n'
+     '        LinearLayout.LayoutParams blp=new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1);\n'
+     '        blp.setMargins((int)(4*dp),0,(int)(4*dp),0);\n'
+     '        bar.addView(b,blp);\n'),
+]
