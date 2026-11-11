@@ -253,13 +253,21 @@ REPLACEMENTS['src/overlay/overlay.cpp'] += [
      '             "the edge, around the camera; Keep clear leaves a black bar along the camera\'s edge. Full screen only.");\n'
      '    }\n'
      '#endif  // Captain Toad camera cutout\n'),
-    # Android: how opaque the on-screen controls are (runtime/ct_touch_menu.cpp)
+    # Android: how opaque the on-screen controls are, the phone's gyro and the layout editor, which the menu
+    # button's own dialog used to offer (runtime/ct_touch_menu.cpp)
     ('            hostui::set("touchControls", v ? "1" : "0");\n        });\n#endif\n',
      '            hostui::set("touchControls", v ? "1" : "0");\n        });\n'
      '#ifdef CT_FOREIGN_GUEST\n'
      '    pip_percent("Controls opacity (%)", ct_touch::opacity(), ct_touch::kOpacityMin, 1.0f, ct_touch::set_opacity);\n'
      '    help("How opaque the on-screen controls are drawn.");\n'
-     '#endif  // Captain Toad touch controls opacity\n'
+     '    if (check("Tilt camera (phone gyro)", ct_touch::tilt(), &v)) hostui::post([v] { ct_touch::set_tilt(v); });\n'
+     '    help("Turning the phone turns the camera, as the GamePad\'s gyro does. Its sensitivity is in Controls > Gyro.");\n'
+     '    if (ImGui::Button("Move and resize touch controls")) {\n'
+     '        ct_touch::request_edit_layout();\n'
+     '        overlay::set_open(false);\n'
+     '    }\n'
+     '    help("Closes this window and lets you drag and pinch each control; holding the menu button does the same.");\n'
+     '#endif  // Captain Toad touch controls opacity, gyro and layout\n'
      '#endif\n'),
 ]
 REPLACEMENTS['src/overlay/hostui.h'] = [

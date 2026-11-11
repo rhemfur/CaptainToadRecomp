@@ -21,9 +21,10 @@ REPLACEMENTS['../android/app/src/main/java/org/wwhdrecomp/wwhd/SetupActivity.jav
      '                    (external != null && new File(external, "game/code/Kinopio.rpx").isFile()));\n'),
 ]
 # Android: one menu button in the top left corner (where the reference has its view button) in place of
-# the view button, the touch controls' show/hide button and the tilt button. Its menu (an Android dialog)
-# opens the settings window, edits the touch controls' layout, turns the phone's gyro on or off and
-# applies the save cheats (runtime/ct_touch_menu.cpp); display options live in Settings > Display only. A long press still edits the layout. The controls are drawn with the
+# the view button, the touch controls' show/hide button and the tilt button. It opens the settings window,
+# which has everything in one place (runtime/ct_touch_menu.cpp): the touch controls, their opacity, the
+# phone's gyro and the layout editor in Settings > Display, the cheats in Settings > Cheats. A long press
+# still edits the layout. The controls are drawn with the
 # opacity of Settings > Display > Touch controls; the menu button keeps the reference's look.
 _touch = '../android/app/src/main/java/org/wwhdrecomp/wwhd/TouchControls.java'
 REPLACEMENTS[_touch] = [
@@ -34,12 +35,9 @@ REPLACEMENTS[_touch] = [
     ('    private static native void nativeShowControls(boolean shown);\n',
      '    private static native void nativeShowControls(boolean shown);\n'
      '    // Captain Toad\'s menu button (runtime/ct_touch_menu.cpp)\n'
-     '    private static native int nativeMenuState();\n'
-     '    private static native void nativeToggleTilt();\n'
      '    private static native void nativeOpenSettings();\n'
-     '    private static native void nativeCheat(int which);\n'
+     '    private static native boolean nativeTakeEditLayout();  // Settings > Display > Move and resize\n'
      '    private static native float nativeOpacity();\n'
-     '    private static native void nativeSetOpacity(float opacity);\n'
      '    private static native boolean nativeCutoutClear();\n'
      '    private static volatile boolean cutoutClear;  // Settings > Display > Camera cutout: Keep clear\n'
      '    // for WwhdActivity\'s window layout: false (use the area) until libmain.so is loaded\n'
@@ -49,8 +47,7 @@ REPLACEMENTS[_touch] = [
      '    }\n'),
     ('    private float lastLx, lastLy, lastRx, lastRy, lastLt, lastRt;\n',
      '    private float lastLx, lastLy, lastRx, lastRy, lastLt, lastRt;\n'
-     '    private float opacity = 1f;  // the controls\' (Settings > Display > Touch controls), not the menu button\'s\n'
-     '    private android.app.AlertDialog menu;\n'),
+     '    private float opacity = 1f;  // the controls\' (Settings > Display > Touch controls), not the menu button\'s\n'),
     ('        toggle = new Control(KIND_TOGGLE, 0, "🎮", 0f, 0f, 0.04f);  // placed in onSizeChanged\n',
      '        toggle = new Control(KIND_TOGGLE, 0, "☰", 0f, 0f, 0.045f);  // the menu button, placed in onSizeChanged\n'),
     ('        // under the game\'s view button (screen_layout.cpp: a square of 9% of the short side, 1.5% from\n'
@@ -78,81 +75,23 @@ REPLACEMENTS[_touch] = [
      '\n'
      '    private Control hit(float x, float y) {\n'),
     ('                        if (!all && !longPressConsumed) setShown(toggleTo);\n',
-     '                        if (!all && !longPressConsumed) post(this::showMenu);\n'),
+     '                        if (!all && !longPressConsumed) post(this::openSettings);\n'),
     ('            nativeControllerConnected(controller);\n',
      '            nativeControllerConnected(controller);\n'
      '            final float o = nativeOpacity();\n'
      '            if (o != opacity) { opacity = o; invalidate(); }\n'
+     '            if (nativeTakeEditLayout()) post(this::beginEditing);\n'
      '            if (getContext() instanceof WwhdActivity)  // applyFullScreen reads the setting again\n'
      '                ((WwhdActivity) getContext()).checkCutout(nativeCutoutClear() != cutoutClear);\n'),
     ('    @Override public void onWindowFocusChanged(boolean hasFocus) {\n',
-     """    // ---- Captain Toad's menu (CaptainToadRecomp tools/patch_runtime.py, runtime/ct_touch_menu.cpp)
-    private static final int[] CHEATS = {1, 2, 4, 8, 16, 32, 64};  // runtime/ct_save.h, as R.array.ct_cheats lists them
-
-    private void showMenu() {
-        if (menu != null && menu.isShowing()) return;
-        final int state;
-        try { state = nativeMenuState(); }
-        catch (UnsatisfiedLinkError e) { return; }  // libmain.so not loaded yet
-        final Context c = getContext();
-        final boolean tilt = (state & 16) != 0;
-        // display options (view, picture shape, touch controls, opacity) live in Settings > Display only
-        final String[] items = {
-            c.getString(R.string.ct_menu_settings),
-            c.getString(R.string.ct_menu_edit_layout),
-            c.getString(tilt ? R.string.ct_menu_tilt_off : R.string.ct_menu_tilt_on),
-            c.getString(R.string.ct_menu_cheats)};
-        show(new android.app.AlertDialog.Builder(c).setTitle(R.string.app_name).setItems(items, (d, which) -> {
-            switch (which) {
-                case 0: nativeOpenSettings(); break;
-                case 1: post(this::beginEditing); break;
-                case 2: nativeToggleTilt(); break;
-                case 3: post(this::showCheats); break;
-            }
-        }).setNegativeButton(android.R.string.cancel, null));
-    }
-
-    // each cheat asks first: it changes the save and closes the game (runtime/cheats.cpp)
-    private void showCheats() {
-        final String[] names = getContext().getResources().getStringArray(R.array.ct_cheats);
-        show(new android.app.AlertDialog.Builder(getContext()).setTitle(R.string.ct_menu_cheats_title)
-            .setItems(names, (d, which) -> post(() -> show(new android.app.AlertDialog.Builder(getContext())
-                .setTitle(names[which]).setMessage(R.string.ct_cheat_confirm)
-                .setPositiveButton(R.string.ct_cheat_apply, (d2, w2) -> nativeCheat(CHEATS[which]))
-                .setNegativeButton(android.R.string.cancel, null))))
-            .setNegativeButton(android.R.string.cancel, null));
-    }
-
-    private void show(android.app.AlertDialog.Builder builder) {
-        menu = builder.create();
-        menu.show();
-        WwhdActivity.syncSystemBars(menu.getWindow());  // full screen: the system bars stay hidden
+     """    // ---- Captain Toad's menu button (CaptainToadRecomp tools/patch_runtime.py, runtime/ct_touch_menu.cpp):
+    // the settings window, where the touch controls' options and the cheats are
+    private void openSettings() {
+        try { nativeOpenSettings(); }
+        catch (UnsatisfiedLinkError ignored) {}  // libmain.so not loaded yet
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
-"""),
-]
-REPLACEMENTS['../android/app/src/main/res/values/strings.xml'] += [
-    ('</resources>\n', """    <!-- Captain Toad's menu button (CaptainToadRecomp tools/patch_runtime.py) -->
-    <string name="ct_menu_settings">Settings</string>
-    <string name="ct_menu_edit_layout">Move and resize touch controls</string>
-    <string name="ct_menu_tilt_on">Tilt camera (phone gyro): off, tap to turn on</string>
-    <string name="ct_menu_tilt_off">Tilt camera (phone gyro): on, tap to turn off</string>
-    <string name="ct_menu_cheats">Cheats</string>
-    <string name="ct_menu_cheats_title">Cheats (change your save)</string>
-    <string name="ct_cheat_confirm">Your save is changed and Captain Toad closes: open it again to play with the cheat. Play since the game last saved is lost. The save from before the first cheat is kept as GameData.bin.before-cheats.</string>
-    <string name="ct_cheat_apply">Apply and close</string>
-    <!-- runtime/ct_save.h bit order (TouchControls.CHEATS) -->
-    <string-array name="ct_cheats">
-        <item>Unlock every episode and course</item>
-        <item>Clear every course</item>
-        <item>Every Super Gem</item>
-        <item>Every bonus objective</item>
-        <item>Every challenge time</item>
-        <item>Every Pixel Toad</item>
-        <item>100% completion</item>
-    </string-array>
-</resources>
 """),
 ]
 # Android: Settings > Display > Camera cutout. Keep clear lays the game out beside a punch-hole or notch

@@ -1,4 +1,4 @@
-// Captain Toad cheats (Gameplay menu, Settings > Cheats, Android's menu button). tools/patch_runtime.py
+// Captain Toad cheats (Gameplay menu, Settings > Cheats; Android's menu button opens Settings). tools/patch_runtime.py
 // puts this file in place of the reference's mods/cheats.cpp, whose cheats edit Wind Waker HD's live
 // save data.
 //
